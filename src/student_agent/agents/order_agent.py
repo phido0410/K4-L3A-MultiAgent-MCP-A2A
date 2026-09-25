@@ -1,12 +1,60 @@
 from __future__ import annotations
 
 import contextlib
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
 from ..domain.findings import EvidenceItem, Finding
 from ..mcp_gateway import EvidenceGateway
 from ..trace import TraceWriter
+
+
+def _parse_time(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+
+
+def _in_window(moment: datetime | None, start: datetime | None, end: datetime | None) -> bool:
+    """Mốc có nằm trong cửa sổ của case không. Thiếu mốc thì coi như nằm trong."""
+    if moment is None:
+        return True
+    if start is not None and moment < start:
+        return False
+    return not (end is not None and moment > end)
+
+
+def filter_case_items(
+    items: list[dict[str, Any]], purchase_at: datetime | None, opened_at: datetime | None
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Lọc dòng item thuộc về case này, trả về (giữ lại, bị loại).
+
+    Gateway trả lẫn dòng của kịch bản khác: cùng `order_item_id` nhưng khác
+    `shipping_limit_date` và `freight_value`. Cộng hết sẽ nhân đôi giá trị đơn,
+    làm `PAY_DUPLICATE` và `PAY_SPLIT_VALID` không bao giờ khớp.
+
+    Lọc theo cùng cửa sổ `[order_purchase_timestamp, opened_at]` mà payment agent
+    dùng cho `event_at`. Nếu lọc xong không còn gì thì lùi về khử trùng theo
+    `order_item_id` để không mất toàn bộ dữ liệu.
+    """
+    kept = [
+        item
+        for item in items
+        if _in_window(_parse_time(item.get("shipping_limit_date")), purchase_at, opened_at)
+    ]
+    if not kept and items:
+        seen: set[str] = set()
+        for item in items:
+            key = str(item.get("order_item_id"))
+            if key not in seen:
+                seen.add(key)
+                kept.append(item)
+    dropped = [item for item in items if item not in kept]
+    return kept, dropped
 
 
 async def analyze_order(
@@ -108,7 +156,22 @@ async def analyze_order(
     except Exception:
         items_data = []
 
-    # 3. Calculate order total (price + freight) using Decimal for exactness
+    # 3. Calculate order total (price + freight) using Decimal for exactness.
+    # Chỉ cộng dòng item thuộc về case này — xem filter_case_items().
+    purchase_at = _parse_time(facts.get("order_purchase_timestamp"))
+    opened_at = _parse_time(case.get("opened_at"))
+    items_data, dropped_items = filter_case_items(items_data, purchase_at, opened_at)
+    conflicts: list[dict[str, Any]] = []
+    if dropped_items:
+        conflicts.append(
+            {
+                "field": "order_item_freight_value",
+                "sources": ["item", "order"],
+                "selected_source": "item",
+                "resolution_code": "ITEM_ROW_OUTSIDE_CASE_WINDOW",
+            }
+        )
+
     total_decimal = Decimal("0.00")
     item_ids: list[str] = []
     seller_ids: list[str] = []
@@ -130,6 +193,7 @@ async def analyze_order(
     order_total_brl = float(round(total_decimal, 2))
     facts["order_total_brl"] = order_total_brl
     facts["items_count"] = len(items_data)
+    facts["items_dropped_count"] = len(dropped_items)
     facts["items"] = items_data
     facts["seller_ids"] = seller_ids
     facts["primary_seller_id"] = seller_ids[0] if seller_ids else None
@@ -196,6 +260,6 @@ async def analyze_order(
         entities=entities,
         facts=facts,
         evidence=evidence_items,
-        conflicts=[],
+        conflicts=conflicts,
         confidence=confidence,
     )

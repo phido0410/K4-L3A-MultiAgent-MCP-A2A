@@ -77,3 +77,48 @@ def test_every_specialist_is_dispatched(tmp_path: Path) -> None:
     _, events = run_workflow(tmp_path)
     handed_off = {event["actor"] for event in events if event["event_type"] == "handoff"}
     assert handed_off == {"order-agent", "shipment-agent", "payment-agent", "policy-agent"}
+
+
+def test_item_rows_outside_the_case_window_are_not_summed() -> None:
+    """Gateway trả lẫn dòng item của kịch bản khác; cộng hết sẽ nhân đôi giá trị đơn.
+
+    Quan sát thật trên L3A_CASE_001 và L3A_CASE_003: hai dòng cùng `order_item_id`,
+    cùng `price`, khác `shipping_limit_date` và `freight_value`.
+    """
+    from datetime import datetime
+
+    from student_agent.agents.order_agent import filter_case_items
+
+    rows = [
+        {"order_item_id": "item-x", "price": "79.00", "freight_value": "10.00",
+         "shipping_limit_date": "2017-12-23T09:00:00-03:00"},
+        {"order_item_id": "item-x", "price": "79.00", "freight_value": "18.00",
+         "shipping_limit_date": "2018-05-14T09:00:00-03:00"},
+    ]
+    purchase = datetime.fromisoformat("2017-12-20T09:00:00-03:00")
+    opened = datetime.fromisoformat("2018-01-01T09:00:00-03:00")
+
+    kept, dropped = filter_case_items(rows, purchase, opened)
+    assert len(kept) == 1
+    assert kept[0]["freight_value"] == "10.00"
+    assert len(dropped) == 1
+
+
+def test_item_filter_falls_back_instead_of_dropping_everything() -> None:
+    """Nếu cửa sổ loại hết thì khử trùng theo order_item_id, không trả rỗng."""
+    from datetime import datetime
+
+    from student_agent.agents.order_agent import filter_case_items
+
+    rows = [
+        {"order_item_id": "item-x", "price": "79.00", "freight_value": "10.00",
+         "shipping_limit_date": "2020-01-01T09:00:00-03:00"},
+        {"order_item_id": "item-x", "price": "79.00", "freight_value": "18.00",
+         "shipping_limit_date": "2020-02-01T09:00:00-03:00"},
+    ]
+    purchase = datetime.fromisoformat("2017-12-20T09:00:00-03:00")
+    opened = datetime.fromisoformat("2018-01-01T09:00:00-03:00")
+
+    kept, dropped = filter_case_items(rows, purchase, opened)
+    assert len(kept) == 1
+    assert len(dropped) == 1

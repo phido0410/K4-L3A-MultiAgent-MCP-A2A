@@ -1,17 +1,21 @@
 """Verifier — CHỦ SỞ HỮU: Đỗ Ngọc Phi.
 
 Chạy trước khi finalize. Verifier KHÔNG sửa kết luận nghiệp vụ; nó chỉ chặn
-output vi phạm bất biến và hạ confidence khi bằng chứng không đủ.
+output vi phạm bất biến. Bất biến tài chính uỷ quyền cho
+`domain/money.py::check_money_invariants` (chủ sở hữu: Quốc), từ vựng
+`resolution_actions` lấy từ `agents/policy_agent.py` — chính là các giá trị
+`recommended_action` mà policy trả về.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from ..domain.money import RESOLUTION_ACTIONS, check_money_invariants
+from ..domain.money import check_money_invariants
+from .policy_agent import RESOLUTION_ACTIONS
 
-#: Issue nào thì bắt buộc phải có hành động cụ thể (không được chỉ NO_ACTION).
-ACTION_REQUIRED_STATUSES = {"action_required"}
+#: Hành động mang tính "không làm gì" — không hợp lệ khi case cần xử lý.
+PASSIVE_ACTIONS = {"document_no_action"}
 
 
 def verify(
@@ -42,15 +46,16 @@ def verify(
                 problems.append(f"V3: claim trích dẫn ref ngoài case: {ref}")
 
     # V4 — entity scope.
-    entities = output.get("affected_entities") or {}
-    for key, values in entities.items():
+    for key, values in (output.get("affected_entities") or {}).items():
         if len(values) != len(set(values)):
             problems.append(f"V4: {key} có phần tử trùng")
         if len(values) > 20:
             problems.append(f"V4: {key} vượt 20 phần tử")
 
-    # V5 — bất biến tài chính.
-    problems.extend(check_money_invariants(output, facts))
+    # V5 — bất biến tài chính (module của Quốc).
+    problems.extend(
+        check_money_invariants(output, captured_total_brl=facts.get("captured_total_brl"))
+    )
 
     # V6 — nhất quán status / action.
     assessment = output.get("assessment") or {}
@@ -58,9 +63,9 @@ def verify(
     unknown = [a for a in actions if a not in RESOLUTION_ACTIONS]
     if unknown:
         problems.append(f"V6: resolution_actions ngoài danh sách: {unknown}")
-    if assessment.get("case_status") in ACTION_REQUIRED_STATUSES and actions in ([], ["NO_ACTION"]):
-        problems.append("V6: case_status=action_required nhưng không có hành động")
-    if assessment.get("case_status") == "no_action" and [a for a in actions if a != "NO_ACTION"]:
+    if assessment.get("case_status") == "action_required" and set(actions) <= PASSIVE_ACTIONS:
+        problems.append("V6: case_status=action_required nhưng không có hành động thực chất")
+    if assessment.get("case_status") == "no_action" and not set(actions) <= PASSIVE_ACTIONS:
         problems.append("V6: case_status=no_action nhưng vẫn đề xuất hành động")
 
     # V7 — confidence bounds.

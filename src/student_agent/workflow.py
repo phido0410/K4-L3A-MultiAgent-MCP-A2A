@@ -1,13 +1,18 @@
 """Coordinator L3A — CHỦ SỞ HỮU: Đỗ Ngọc Phi.
 
-Luồng: coordinator giao việc tuần tự cho bốn specialist, mỗi bước bàn giao cho
-bước sau, rồi verifier kiểm tra bất biến trước khi finalize.
+Luồng:
 
-    case_received (cli) -> task_assigned/handoff x4 -> policy_decided
-                        -> verification_completed -> case_finalized (cli)
+    case_received (cli)
+      -> order-agent -> shipment-agent -> payment-agent
+      -> rules.decide  (chốt primary_issue)
+      -> policy-agent  (tra rule của issue đó, emit policy_decided)
+      -> money.compute_refund
+      -> verifier      (emit verification_completed)
+      -> case_finalized (cli)
 
-Coordinator không tự gọi MCP. Mọi truy vấn đi qua `AgentContext` của từng agent,
-nơi áp allowlist tool và tự emit `tool_result_consumed`.
+Policy chạy SAU `rules.decide` vì nó cần biết `primary_issue` mới tra được rule
+tương ứng. Coordinator không tự gọi MCP; mọi truy vấn đi qua `ScopedGateway`
+của từng agent.
 """
 
 from __future__ import annotations
@@ -31,14 +36,7 @@ from .mcp_gateway import EvidenceGateway
 from .trace import TraceWriter
 
 MAX_EVIDENCE_REFS = 30
-
-#: Chuỗi bàn giao: mỗi agent bàn giao cho agent kế tiếp, agent cuối giao verifier.
-PIPELINE = (
-    ("order-agent", order_agent.analyze, "shipment-agent"),
-    ("shipment-agent", shipment_agent.analyze, "payment-agent"),
-    ("payment-agent", payment_agent.analyze, "policy-agent"),
-    ("policy-agent", policy_agent.analyze, "verifier"),
-)
+MAX_CLAIM_ASSESSMENTS = 5
 
 
 async def solve_case(
@@ -47,28 +45,51 @@ async def solve_case(
     case_id = case["case_id"]
     dispatcher = Dispatcher(case, gateway, trace)
 
-    findings: list[Finding] = []
-    for actor, agent, handoff_to in PIPELINE:
-        findings.append(await dispatcher.run(actor, agent, handoff_to=handoff_to))
-
-    signals = collect_signals(findings)
-    facts = collect_facts(findings)
-    decision = rules.decide(signals, facts)
-
-    trace.emit(
-        case_id=case_id,
-        event_type="policy_decided",
-        actor="coordinator",
-        decision_code=decision.primary_issue,
-        attributes={
-            "case_status": decision.case_status,
-            "signals": ",".join(sorted(signals))[:200],
-        },
+    order = await dispatcher.run(
+        "order-agent",
+        lambda scoped: order_agent.analyze_order(case, scoped, trace),
+        handoff_to="shipment-agent",
+    )
+    shipment = await dispatcher.run(
+        "shipment-agent",
+        lambda scoped: shipment_agent.analyze_shipment(case, scoped, trace, order_finding=order),
+        handoff_to="payment-agent",
+    )
+    payment = await dispatcher.run(
+        "payment-agent",
+        lambda scoped: payment_agent.analyze(case, scoped, trace, order_facts=order.facts),
+        handoff_to="coordinator",
     )
 
-    refund_total, refund_lines = compute_refund(decision.primary_issue, facts, signals)
+    evidence_findings = [order, shipment, payment]
+    decision = rules.decide(collect_signals(evidence_findings), collect_facts(evidence_findings))
+
+    seller_ids = merge_entities(evidence_findings).get("seller_ids", [])
+    policy = await dispatcher.run(
+        "policy-agent",
+        lambda scoped: policy_agent.analyze(
+            case, scoped, trace, primary_issue=decision.primary_issue, seller_ids=seller_ids
+        ),
+        handoff_to="verifier",
+    )
+
+    findings = [*evidence_findings, policy]
+    facts = collect_facts(findings)
+    _apply_policy(decision, policy)
+
+    refund_total, refund_lines = compute_refund(
+        facts.get("order_total_brl"),
+        facts.get("captured_total_brl"),
+        facts.get("refunded_total_brl"),
+        collect_signals(findings),
+        {"refund_brl": policy.facts.get("refund_brl")},
+        primary_issue=decision.primary_issue,
+        entity_id=(case["customer_request"].get("claimed_order_id")),
+    )
+
     evidence_refs = _dedupe_refs(findings)
     confidence = rules.confidence_for(decision, [f.confidence for f in findings])
+    actions = _actions_for(decision, policy, refund_total)
 
     output: dict[str, Any] = {
         "schema_version": OUTPUT_SCHEMA_VERSION,
@@ -91,7 +112,7 @@ async def solve_case(
             "recommended_refund_brl": refund_total,
             "refund_lines": refund_lines,
         },
-        "resolution_actions": _actions_for(decision, refund_total),
+        "resolution_actions": actions,
     }
 
     problems = verify(output, case, set(evidence_refs), facts)
@@ -111,8 +132,18 @@ async def solve_case(
     return output
 
 
+def _apply_policy(decision: rules.Decision, policy: Finding) -> None:
+    """Policy có thẩm quyền cao hơn hằng số trong rules.py cho status và trách nhiệm."""
+    case_status = policy.facts.get("case_status")
+    if case_status in {"action_required", "no_action", "needs_investigation"}:
+        decision.case_status = case_status
+    parties = policy.facts.get("responsible_parties")
+    if parties:
+        decision.responsible_parties = parties[:5]
+
+
 def _dedupe_refs(findings: list[Finding]) -> list[str]:
-    """Gộp evidence_ref của mọi agent, giữ thứ tự tiêu thụ, cắt theo trần schema.
+    """Gộp evidence_ref theo thứ tự tiêu thụ, bỏ trùng, cắt theo trần schema.
 
     Chỉ gom ref mà agent chủ động đưa vào `finding.evidence` — tức ref thực sự
     dẫn tới kết luận. Điểm evidence là F1 nên cite thừa cũng bị phạt.
@@ -133,7 +164,7 @@ def _assess_claims(
 ) -> list[dict[str, Any]]:
     """Đối chiếu từng claim của khách với kết luận dựa trên evidence."""
     result: list[dict[str, Any]] = []
-    for claim in case["customer_request"].get("claims", [])[:5]:
+    for claim in case["customer_request"].get("claims", [])[:MAX_CLAIM_ASSESSMENTS]:
         topic = claim.get("topic")
         if decision.primary_issue == "insufficient_evidence":
             verdict = "insufficient_evidence"
@@ -152,29 +183,18 @@ def _assess_claims(
     return result
 
 
-def _actions_for(decision: rules.Decision, refund_total: float) -> list[str]:
-    """Sinh hành động từ danh sách đóng trong money.RESOLUTION_ACTIONS."""
-    if decision.case_status == "no_action":
-        return ["NO_ACTION"]
-    if decision.primary_issue == "insufficient_evidence":
-        return ["REQUEST_MORE_EVIDENCE"]
+def _actions_for(decision: rules.Decision, policy: Finding, refund_total: float) -> list[str]:
+    """Dùng nguyên văn `recommended_action` của policy làm resolution_actions.
 
-    actions: list[str] = []
-    if refund_total > 0:
-        actions.append("ISSUE_FULL_REFUND" if decision.primary_issue in {
-            "canceled_order_paid", "unavailable_order_paid"
-        } else "ISSUE_PARTIAL_REFUND")
-    if decision.primary_issue == "refund_failed":
-        actions.append("RETRY_REFUND")
-
-    escalation = {
-        "late_delivery_seller": "ESCALATE_TO_SELLER",
-        "late_delivery_logistics": "ESCALATE_TO_LOGISTICS",
-        "duplicate_charge": "ESCALATE_TO_PAYMENT_PROVIDER",
-        "payment_mismatch": "ESCALATE_TO_PAYMENT_PROVIDER",
-        "refund_pending": "ESCALATE_TO_PAYMENT_PROVIDER",
-    }.get(decision.primary_issue)
-    if escalation:
-        actions.append(escalation)
-
-    return actions[:8] or ["REQUEST_MORE_EVIDENCE"]
+    Policy là nguồn có thẩm quyền; mã tự đặt sẽ lệch với thứ scorer mong đợi.
+    """
+    actions = [a for a in (policy.facts.get("resolution_actions") or []) if a]
+    if not actions:
+        actions = ["request_more_evidence"]
+    if refund_total <= 0 and decision.case_status == "no_action":
+        actions = [a for a in actions if a == "document_no_action"] or ["document_no_action"]
+    deduped: list[str] = []
+    for action in actions:
+        if action not in deduped:
+            deduped.append(action)
+    return deduped[:8]
