@@ -87,7 +87,7 @@ async def solve_case(
         entity_id=(case["customer_request"].get("claimed_order_id")),
     )
 
-    evidence_refs = _dedupe_refs(findings)
+    evidence_refs = _dedupe_refs(findings, decision.primary_issue)
     confidence = rules.confidence_for(decision, [f.confidence for f in findings])
     actions = _actions_for(decision, policy, refund_total)
 
@@ -145,17 +145,37 @@ def _apply_policy(decision: rules.Decision, policy: Finding) -> None:
         decision.responsible_parties = parties[:5]
 
 
-def _dedupe_refs(findings: list[Finding]) -> list[str]:
+#: Evidence domains that support each conclusion. Evidence is scored as F1, so citing a
+#: domain the conclusion does not rest on costs precision. Issues not listed keep all.
+RELEVANT_DOMAINS: dict[str, frozenset[str]] = {
+    "canceled_order_paid": frozenset({"order", "item", "payment", "policy"}),
+    "unavailable_order_paid": frozenset({"order", "item", "seller", "payment", "policy"}),
+    "late_delivery_seller": frozenset({"order", "item", "seller", "shipment", "policy"}),
+    "late_delivery_logistics": frozenset({"order", "shipment", "policy"}),
+    "duplicate_charge": frozenset({"order", "item", "payment", "policy"}),
+    "payment_mismatch": frozenset({"order", "item", "payment", "policy"}),
+    "valid_split_payment": frozenset({"order", "item", "payment", "policy"}),
+    "refund_pending": frozenset({"order", "payment", "refund", "policy"}),
+    "refund_failed": frozenset({"order", "payment", "refund", "policy"}),
+}
+
+
+def _dedupe_refs(findings: list[Finding], primary_issue: str | None = None) -> list[str]:
     """Gộp evidence_ref theo thứ tự tiêu thụ, bỏ trùng, cắt theo trần schema.
 
     Chỉ gom ref mà agent chủ động đưa vào `finding.evidence` — tức ref thực sự
     dẫn tới kết luận. Điểm evidence là F1 nên cite thừa cũng bị phạt.
     """
+    relevant = RELEVANT_DOMAINS.get(primary_issue or "")
     refs: list[str] = []
     for finding in findings:
-        for ref in finding.refs():
-            if ref not in refs:
-                refs.append(ref)
+        for item in finding.evidence:
+            if relevant is not None and item.domain not in relevant:
+                continue
+            if item.evidence_ref not in refs:
+                refs.append(item.evidence_ref)
+    if not refs and relevant is not None:
+        return _dedupe_refs(findings)
     return refs[:MAX_EVIDENCE_REFS]
 
 
