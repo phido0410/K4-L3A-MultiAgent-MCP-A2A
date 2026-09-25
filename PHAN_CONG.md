@@ -581,23 +581,39 @@ Sau buổi họp, Phi viết kết quả vào `domain/rules.py` và `REPORT.md` 
 
 ---
 
-## 8. Lịch
+## 8. Kế hoạch — Lab 240 phút / 6 pha (theo slide ban tổ chức)
 
-| Pha | Ngày | Việc | Ai |
-| --- | --- | --- | --- |
-| P0 | D1 | Dựng môi trường, `day09 mcp-tools` chạy được. Phi commit `domain/findings.py` | Cả nhóm |
-| P1 | D1–D2 | Khảo sát tool domain của mình, viết file ghi chú | Bảo, Quốc |
-| P2 | D2–D4 | Code agent + rule + test độc lập | Bảo, Quốc \|\| Phi làm coordinator |
-| **P3** | **D4** | **Họp chốt luật (mục 7)** | **Cả nhóm** |
-| P4 | D4–D5 | Ráp coordinator + verifier, chạy `day09 run` 100 case | Phi chủ trì |
-| P5 | D5–D6 | Nộp thử, đọc breakdown public, sửa thành phần yếu nhất | Cả nhóm |
-| P6 | D6–D7 | Hoàn thiện `ARCHITECTURE.md` + `REPORT.md`, nộp bản cuối | Cả nhóm |
+> Đây là lab **4 tiếng tại lớp**, không phải nhiều ngày. Bản kế hoạch D1–D7 trước đó đã sai
+> và được thay bằng bảng này.
 
-> Phi ánh xạ D1–D7 sang ngày thật khi có deadline chính thức.
+| Pha | Nội dung theo slide | Phút | Trạng thái nhóm |
+| --- | --- | ---: | --- |
+| 1 | Đăng ký Team, `.env`, MCP Ping | 30 | ✅ Xong — `day09 mcp-tools` trả 10 tool |
+| 2 | Thiết kế Multi-Agent A2A | 35 | ✅ Xong — `a2a.py`, `findings.py`, `ARCHITECTURE.md` |
+| 3 | Specialist Agents + MCP Gateway | 45 | ✅ Xong — 4 agent của Bảo và Quốc, đã merge |
+| 4 | Policy, Verifier & Calibration | 40 | ✅ Xong — `policy_agent`, `verifier`, `money.py` |
+| 5 | **Kích hoạt Workspace, Batch 100** | **60** | ⏳ **Đang ở đây** |
+| 6 | **ZIP, Nộp Workspace & GitHub** | **30** | ⬜ Chưa |
 
-**Nguyên tắc:** nộp sớm một bản chạy được ở P5 dù điểm thấp, để lấy feedback breakdown rồi mới tối ưu. Không dồn tất cả vào một lần nộp cuối.
+**Còn lại khoảng 90 phút.** Thứ tự bắt buộc:
 
----
+1. Smoke test 5 case xanh → `git checkout main && git merge integrate/bao-quoc`
+2. `git push origin main` (Contributors phải đủ 3 tên — đã kiểm, đạt)
+3. `day09 run` cho 100 case — **chỉ một người chạy**, gateway throttle theo team key
+4. `day09 validate` → `day09 package --output dist/submission.zip`
+5. Upload ZIP lên Workspace `/l3a`
+6. Nhóm trưởng nộp link GitHub lên VLearn LMS **trước 23:59 hôm nay**
+
+### Chiến thuật nộp bài
+
+Slide ghi **"Re-Submit Sau 120 Giây"** và **"LIVE LEADERBOARD (VM AUTO-SCORER)"**.
+Nghĩa là nộp được nhiều lần, mỗi lần cách nhau 2 phút, và thấy điểm public ngay.
+
+Vì vậy: **nộp bản chạy được sớm nhất có thể**, kể cả điểm thấp, rồi đọc breakdown
+để biết thành phần nào yếu mà sửa. Đừng dồn tất cả vào một lần nộp cuối — mất
+cơ hội dùng feedback.
+
+Slide cũng ghi **"Thưởng Điểm Top 10 Cuối Buổi"**.
 
 ## 9. Hỏi đáp nhanh
 

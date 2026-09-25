@@ -12,7 +12,9 @@
 | Variant | `l3a` — 100 case (50 public / 50 private) |
 | Repo | `K4-L3A-MultiAgent-MCP-A2A` (giữ nguyên tên gốc, không đổi) |
 | Team name | _TODO: điền sau khi `/register`_ |
-| Deadline | _TODO: điền hạn nộp_ |
+| Thời lượng | **240 phút / 6 pha** (lab tại lớp) |
+| Hạn nộp link GitHub | **23:59 hôm nay**, lên VLearn LMS — nhóm trưởng nộp |
+| Nộp lại | Được, **mỗi 120 giây**; leaderboard chấm tự động theo thời gian thực |
 | Ngày khởi động | 2026-09-25 |
 
 ### Thành viên
@@ -152,23 +154,39 @@ Thêm subpackage cần có `__init__.py`; `setuptools` đã cấu hình `package
 
 ---
 
-## 5. Kế hoạch theo pha
+## 5. Kế hoạch — Lab 240 phút / 6 pha (theo slide ban tổ chức)
 
-> D = ngày làm việc, ánh xạ sang lịch thật khi biết deadline.
+> Đây là lab **4 tiếng tại lớp**, không phải nhiều ngày. Bản kế hoạch D1–D7 trước đó đã sai
+> và được thay bằng bảng này.
 
-| Pha | Ngày | Nội dung | Ai | Điều kiện hoàn thành |
-| --- | --- | --- | --- | --- |
-| **P0 — Nền tảng** | D1 | venv, `.env`, đăng ký team, `validate-inputs`, `mcp-tools`, `findings.py` | Phi (Bảo/Quốc dựng env riêng) | Cả 3 chạy được `day09 mcp-tools`, có `docs/mcp-tools.md` |
-| **P1 — Khảo sát domain** | D1–D2 | Mỗi người gọi thử tool domain của mình trên 3–5 case, ghi field thực tế | Bảo, Quốc | Biết chính xác schema `data` từng domain |
-| **P2 — Luật đơn lẻ** | D2–D4 | Viết agent + rule + unit test độc lập theo stub | Bảo, Quốc \|\| Phi làm a2a + coordinator | `pytest` xanh, mỗi agent trả `Finding` hợp lệ |
-| **P3 — Họp chốt luật** | D4 | C1–C5 trong mục 4.4 | Cả nhóm | Ma trận quyết định được viết vào `rules.py` + ARCHITECTURE |
-| **P4 — Ráp & verifier** | D4–D5 | Ghép coordinator, verifier, money invariants; chạy `day09 run` toàn bộ 100 case | Phi chủ trì | `day09 validate` PASS |
-| **P5 — Nộp thử & tinh chỉnh** | D5–D6 | `day09 package`, nộp, đọc breakdown public, sửa thành phần yếu nhất trước | Cả nhóm | Có điểm public đầu tiên |
-| **P6 — Hoàn thiện** | D6–D7 | ARCHITECTURE đầy đủ, REPORT đầy đủ, nộp bản cuối | Cả nhóm | Không còn TODO trong ARCHITECTURE.md |
+| Pha | Nội dung theo slide | Phút | Trạng thái nhóm |
+| --- | --- | ---: | --- |
+| 1 | Đăng ký Team, `.env`, MCP Ping | 30 | ✅ Xong — `day09 mcp-tools` trả 10 tool |
+| 2 | Thiết kế Multi-Agent A2A | 35 | ✅ Xong — `a2a.py`, `findings.py`, `ARCHITECTURE.md` |
+| 3 | Specialist Agents + MCP Gateway | 45 | ✅ Xong — 4 agent của Bảo và Quốc, đã merge |
+| 4 | Policy, Verifier & Calibration | 40 | ✅ Xong — `policy_agent`, `verifier`, `money.py` |
+| 5 | **Kích hoạt Workspace, Batch 100** | **60** | ⏳ **Đang ở đây** |
+| 6 | **ZIP, Nộp Workspace & GitHub** | **30** | ⬜ Chưa |
 
-**Nguyên tắc:** nộp sớm một bản chạy được (dù điểm thấp) ở P5 để có feedback public, rồi tối ưu theo breakdown — đừng dồn tất cả vào một lần nộp cuối.
+**Còn lại khoảng 90 phút.** Thứ tự bắt buộc:
 
----
+1. Smoke test 5 case xanh → `git checkout main && git merge integrate/bao-quoc`
+2. `git push origin main` (Contributors phải đủ 3 tên — đã kiểm, đạt)
+3. `day09 run` cho 100 case — **chỉ một người chạy**, gateway throttle theo team key
+4. `day09 validate` → `day09 package --output dist/submission.zip`
+5. Upload ZIP lên Workspace `/l3a`
+6. Nhóm trưởng nộp link GitHub lên VLearn LMS **trước 23:59 hôm nay**
+
+### Chiến thuật nộp bài
+
+Slide ghi **"Re-Submit Sau 120 Giây"** và **"LIVE LEADERBOARD (VM AUTO-SCORER)"**.
+Nghĩa là nộp được nhiều lần, mỗi lần cách nhau 2 phút, và thấy điểm public ngay.
+
+Vì vậy: **nộp bản chạy được sớm nhất có thể**, kể cả điểm thấp, rồi đọc breakdown
+để biết thành phần nào yếu mà sửa. Đừng dồn tất cả vào một lần nộp cuối — mất
+cơ hội dùng feedback.
+
+Slide cũng ghi **"Thưởng Điểm Top 10 Cuối Buổi"**.
 
 ## 6. Nhật ký công việc
 
@@ -187,6 +205,9 @@ Thêm subpackage cần có `__init__.py`; `setuptools` đã cấu hình `package
 | 2026-09-25 | Phi | Xác nhận `day09 mcp-tools` **hoạt động bình thường** — R-07 không phải lỗi SDK mà là giới hạn session | Đã sửa lại cảnh báo sai trong `PHAN_CONG.md` |
 | 2026-09-25 | Phi | **Khảo sát dữ liệu thật** trên `L3A_CASE_001`, viết `docs/mcp-evidence-shapes.md` | Gỡ chặn R-08. Phát hiện lớn: `get_policy` trả sẵn `case_status` + `refund_brl` + `responsible_parties` cho từng issue |
 | 2026-09-25 | Phi | Nối policy vào `rules.py` và `money.py` (policy có thẩm quyền cao hơn hằng số hard-code) | 10/10 test vẫn xanh |
+| 2026-09-25 | Phi | Merge nhánh `Bao` và `cuongquoc_2A202602469`, viết lớp tích hợp `ScopedGateway` | 57 test xanh. Agent của hai bạn chạy nguyên không phải sửa |
+| 2026-09-25 | Phi | **Tìm và sửa bug `order_total_brl` nhân đôi** trong `order_agent.py` | `get_order_items` trả lẫn dòng ngoài cửa sổ case; cộng hết làm `PAY_DUPLICATE` và `PAY_SPLIT_VALID` không bao giờ khớp |
+| 2026-09-25 | Phi | Đối chiếu slide ban tổ chức, sửa kế hoạch D1–D7 thành 6 pha / 240 phút | Xem mục 5 và R-10 |
 | | | _TODO_ | |
 
 ---
@@ -232,6 +253,8 @@ Ghi lại mọi quyết định có thể bị hỏi lại khi chấm. Không gh
 | R-03 | ~~Chưa biết tool profile `l3a`~~ | ✅ **Đã xử lý 2026-09-25** | Xác nhận 10 tool, ghi ở `PHAN_CONG.md` mục 4.6 và cấu hình vào `a2a.py::TOOL_SCOPES` | Phi |
 | R-07 | **Gateway giới hạn session đồng thời trên mỗi Team API Key.** Session không `DELETE` sẽ giữ slot, mọi kết nối sau treo tới hết timeout | Trung bình — tự hồi phục sau 5–10 phút | `day09 mcp-tools` và `day09 run` hoạt động bình thường khi không có session treo. Quy ước: **không ai chạy lệnh gọi MCP khi người khác đang chạy**; bị timeout thì chờ, đừng thử lại liên tục | Cả nhóm |
 | R-08 | ~~Chưa biết cấu trúc `data`~~ | ✅ **Đã xử lý 2026-09-25** | Khảo sát `L3A_CASE_001`, ghi vào `docs/mcp-evidence-shapes.md`. Còn `get_refund_timeline` chưa có mẫu (case 001 không có refund) — Quốc khảo sát ở Q1 | Phi |
+| R-10 | **Tên tool trong slide ban tổ chức không khớp gateway thật.** Slide ghi `get_payment`, `lookup_tracking`, `lookup_order`, `reconcile_payment` — không tool nào trong số này tồn tại | Thấp với nhóm ta (đã discovery), cao với nhóm khác | Dùng danh sách 10 tool thật ở `PHAN_CONG.md` mục 4.6. Slide chỉ mang tính minh hoạ | Cả nhóm |
+| R-11 | Nếu `day09 run` bị throttle giữa chừng khi chạy 100 case thì mất thời gian pha 5 | Trung bình | Chỉ một người chạy, không ai gọi MCP song song. Nộp bản chạy được sớm rồi cải thiện, vì được nộp lại mỗi 120 giây | Phi |
 | R-09 | Chưa rõ `get_policy` là per-case hay bảng tĩnh dùng chung. `late_delivery_seller.party_id` trên case 001 trỏ tới seller **không thuộc** order đó | Trung bình — ảnh hưởng cách viết `money.py` | Quốc gọi `get_policy` trên 2–3 case, so `refund_brl`. Đây là việc xác minh đầu tiên của Q1 | Quốc |
 | R-04 | Cite thừa evidence làm tụt precision (điểm evidence là F1, không phải recall) | Cao | Chốt chính sách trích dẫn ở C4, verifier lọc ref không dùng để kết luận | Phi |
 | R-05 | Mọi MCP call đều bị audit; gọi sai `case_id` gây hard gate `cross_scope_evidence_ref` | Cao | Luôn gọi qua `gateway.call()` (đã tự nhét `case_id`), cấm truyền tay | Cả nhóm |
