@@ -19,11 +19,11 @@
 
 ### Thành viên
 
-| Họ tên | Vai trò | Sở hữu chính |
-| --- | --- | --- |
-| Đỗ Ngọc Phi | Lead / Coordinator / Integration | Orchestration, A2A, Verifier, Submission |
-| Nguyễn Trường Bảo | Order & Shipment Analyst | Đơn hàng, item, vận chuyển, entity, trách nhiệm |
-| Phạm Cường Quốc | Payment & Policy Analyst | Thanh toán, hoàn tiền, policy, tính tiền |
+| Họ tên | MSSV | Vai trò | Sở hữu chính |
+| --- | --- | --- | --- |
+| Đỗ Ngọc Phi | 2A202602531 | Lead / Coordinator / Integration | Orchestration, A2A, Verifier, Submission |
+| Nguyễn Trường Bảo | 2A202602540 | Order & Shipment Analyst | Đơn hàng, item, vận chuyển, entity, trách nhiệm |
+| Phạm Cường Quốc | 2A202602469 | Payment & Policy Analyst | Thanh toán, hoàn tiền, policy, tính tiền |
 
 ---
 
@@ -86,7 +86,7 @@ Thêm subpackage cần có `__init__.py`; `setuptools` đã cấu hình `package
 
 > Bản briefing gửi cho Bảo và Quốc (tự chứa: ngữ cảnh, setup, hợp đồng code, định nghĩa hoàn thành): [`PHAN_CONG.md`](PHAN_CONG.md). Khi đổi phân công, cập nhật cả hai file.
 
-### 4.1 Đỗ Ngọc Phi — Lead / Coordinator / Verifier / Submission
+### 4.1 Đỗ Ngọc Phi (2A202602531) — Lead / Coordinator / Verifier / Submission
 
 | # | Đầu việc | Deliverable | Điểm liên quan |
 | --- | --- | --- | --- |
@@ -106,7 +106,7 @@ Thêm subpackage cần có `__init__.py`; `setuptools` đã cấu hình `package
 | P14 | Xử lý `tests/test_release_safety.py` đang FAIL + giữ CI xanh | CI xanh | — |
 | P15 | Cập nhật `REPORT.md` sau mỗi buổi | File này | — |
 
-### 4.2 Nguyễn Trường Bảo — Order / Item / Shipment / Entity
+### 4.2 Nguyễn Trường Bảo (2A202602540) — Order / Item / Shipment / Entity
 
 | # | Đầu việc | Deliverable | Điểm liên quan |
 | --- | --- | --- | --- |
@@ -122,7 +122,7 @@ Thêm subpackage cần có `__init__.py`; `setuptools` đã cấu hình `package
 | B10 | Unit test cho luật order/shipment (dùng fixture, không gọi MCP thật) | `tests/test_order_shipment.py` | — |
 | B11 | `ARCHITECTURE.md` §2 dòng Order/Item và Shipment | — | — |
 
-### 4.3 Phạm Cường Quốc — Payment / Refund / Policy / Money
+### 4.3 Phạm Cường Quốc (2A202602469) — Payment / Refund / Policy / Money
 
 | # | Đầu việc | Deliverable | Điểm liên quan |
 | --- | --- | --- | --- |
