@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -58,13 +57,15 @@ def _build_http_client(team_api_key: str) -> httpx2.AsyncClient:
     timeout = httpx2.Timeout(300.0, connect=30.0, write=30.0, pool=30.0)
     try:
         return httpx2.AsyncClient(headers=headers, timeout=timeout, http2=True)
-    except ImportError:
-        print(
-            "CẢNH BÁO: thiếu gói 'h2' nên phải dùng HTTP/1.1; "
-            "tool call nhiều khả năng sẽ ConnectTimeout. Chạy: pip install -e '.[dev]'",
-            file=sys.stderr,
-        )
-        return httpx2.AsyncClient(headers=headers, timeout=timeout)
+    except ImportError as exc:
+        # Không lùi về HTTP/1.1: nó KHÔNG chạy được với gateway này. Lùi âm thầm
+        # sẽ tạo ra 100 output rỗng evidence, trông hợp lệ ở máy nhưng bị hard
+        # gate `missing_required_evidence` và ăn 0 điểm. Thà dừng ngay.
+        raise RuntimeError(
+            "Thiếu gói 'h2'. MCP gateway chỉ hoạt động qua HTTP/2; dùng HTTP/1.1 "
+            "sẽ ConnectTimeout ở tool call đầu tiên và sinh ra bài nộp 0 điểm.\n"
+            "Chạy: pip install -e \".[dev]\""
+        ) from exc
 
 
 @asynccontextmanager

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import zipfile
 from datetime import UTC, datetime
@@ -86,6 +87,36 @@ def validate_artifacts(
     return outputs, normalized_lines
 
 
+#: Tỉ lệ case được phép không có evidence trước khi coi là hỏng kết nối.
+MAX_EMPTY_EVIDENCE_RATIO = 0.15
+
+
+def check_evidence_health(outputs: dict[str, Any]) -> None:
+    """Chặn đóng gói khi phần lớn case không có evidence.
+
+    Agent nuốt lỗi MCP (`except Exception`) nên hỏng kết nối giữa chừng không
+    hiện ra ở đâu cả: output vẫn đủ 100 file, vẫn hợp schema, `day09 validate`
+    vẫn pass. Nhưng case không có evidence sẽ dính hard gate
+    `missing_required_evidence` và cả bài nộp về 0 điểm.
+
+    Đây là cửa cuối trước khi tạo ZIP. Đặt DAY09_ALLOW_EMPTY_EVIDENCE=1 để bỏ
+    qua nếu thật sự có ý định nộp như vậy.
+    """
+    if os.getenv("DAY09_ALLOW_EMPTY_EVIDENCE", "").strip() == "1":
+        return
+    empty = [case_id for case_id, out in outputs.items() if not out.get("evidence_refs")]
+    ratio = len(empty) / max(len(outputs), 1)
+    if ratio <= MAX_EMPTY_EVIDENCE_RATIO:
+        return
+    raise ValueError(
+        f"{len(empty)}/{len(outputs)} case không có evidence_ref nào "
+        f"({ratio:.0%}). Gần như chắc chắn kết nối MCP đã chết giữa chừng — "
+        f"nộp bản này sẽ bị hard gate missing_required_evidence và ăn 0 điểm.\n"
+        f"Case rỗng đầu tiên: {empty[:5]}\n"
+        f"Kiểm tra: pip install -e \".[dev]\" rồi chạy lại day09 run."
+    )
+
+
 def package_submission(root: Path, destination: Path) -> Path:
     from .cases import load_case_set
 
@@ -93,6 +124,7 @@ def package_submission(root: Path, destination: Path) -> Path:
     case_set = load_case_set(root)
     contracts = Contracts(root / "contracts" / "schemas")
     outputs, trace_lines = validate_artifacts(root, case_set, contracts)
+    check_evidence_health(outputs)
     manifest = build_manifest(case_set)
     contracts.validate_manifest(manifest)
 
