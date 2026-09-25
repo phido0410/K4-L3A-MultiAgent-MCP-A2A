@@ -17,13 +17,16 @@ Input → Coordinator → Specialists → Verifier → Output
 | Actor | Input | Trách nhiệm | Output/handoff |
 | --- | --- | --- | --- |
 | Coordinator | TODO | TODO | TODO |
-| Order/item | TODO | TODO | TODO |
+| Order/item | `case: dict` | Truy vấn trạng thái đơn hàng, danh sách item, tính tổng giá trị đơn hàng `order_total_brl`, xác định seller và phát tín hiệu trạng thái đơn (`ORDER_STATUS_*`). **Quyền gọi tool:** `get_order`, `get_order_items`, `get_sellers`. | `Finding` (actor=`order-agent`, signals, entities, facts, evidence) bàn giao cho Coordinator, chia sẻ facts cho Payment Agent và Shipment Agent |
 | Payment | TODO | TODO | TODO |
-| Shipment | TODO | TODO | TODO |
+| Shipment | `case: dict`, `order_finding: Finding` (tùy chọn) | Truy vấn tóm tắt tiến trình vận chuyển, kiểm toán các mốc thời gian, xác định nguyên nhân trễ hạn (do seller bàn giao muộn `SHIP_LATE_SELLER` hay do carrier vận chuyển chậm `SHIP_LATE_LOGISTICS`, hoặc đúng hạn `SHIP_ON_TIME`), phát hiện xung đột mốc thời gian với order. **Quyền gọi tool:** `get_shipment_summary`. | `Finding` (actor=`shipment-agent`, signals, facts, ranked_causes, responsible_parties, conflicts, evidence) bàn giao cho Coordinator và Verifier |
 | Policy | TODO | TODO | TODO |
 | Verifier | TODO | TODO | TODO |
 
-Nêu rõ actor nào được quyền gọi tool nào. Tránh cho mọi agent quyền truy vấn tất cả tool nếu không cần thiết.
+### Phân quyền gọi MCP Tools theo Actor
+- **Order/item Agent (`order-agent`):** Được cấp quyền gọi `get_order`, `get_order_items`, `get_sellers`.
+- **Shipment Agent (`shipment-agent`):** Được cấp quyền gọi `get_shipment_summary`.
+- Tuyệt đối không cho phép agent tự do gọi các tool ngoài domain của mình để tránh lãng phí ngân sách call budget và vi phạm nguyên tắc audit.
 
 ## 3. A2A protocol
 
