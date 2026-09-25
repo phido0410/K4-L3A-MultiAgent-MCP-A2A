@@ -34,3 +34,6 @@ dist/*
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Khảo sát MCP tạm thời
+.mcp-probe-headers.tmp
