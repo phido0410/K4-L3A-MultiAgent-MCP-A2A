@@ -22,11 +22,21 @@ def _filter_window(
     field: str,
     start: datetime | None,
     end: datetime | None,
+    *,
+    fallback_when_empty: bool,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Giữ lại dòng có mốc thời gian nằm trong cửa sổ của case.
 
-    Dòng thiếu mốc được giữ (không đủ căn cứ để loại). Nếu lọc xong không còn
-    gì thì trả lại nguyên danh sách — thà dùng dữ liệu nhiễu còn hơn mù hoàn toàn.
+    Dòng thiếu mốc được giữ vì không đủ căn cứ để loại.
+
+    `fallback_when_empty` quyết định xử lý khi lọc xong không còn gì:
+
+    - `shipping_limits` cần ít nhất một hạn mới tính được seller trễ hay không,
+      nên bật fallback: thà dùng dòng ngoài cửa sổ còn hơn mù hoàn toàn.
+    - `events` thì KHÔNG: danh sách rỗng là hợp lệ và có nghĩa — không có sự
+      kiện nào bị đánh dấu. Bật fallback ở đây sẽ hồi sinh đúng cái event nhiễu
+      vừa loại, và đó chính là lý do case giao đúng hạn từng bị kết luận
+      `late_delivery_logistics` thay vì `unsupported_claim`.
     """
     if start is None and end is None:
         return rows, []
@@ -38,7 +48,9 @@ def _filter_window(
             (start is None or moment >= start) and (end is None or moment <= end)
         )
         (kept if inside else dropped).append(row)
-    return (kept, dropped) if kept else (rows, [])
+    if not kept and fallback_when_empty:
+        return rows, []
+    return kept, dropped
 
 
 async def analyze_shipment(
@@ -127,9 +139,11 @@ async def analyze_shipment(
     )
     opened_at = _parse_iso(case.get("opened_at"))
     shipping_limits, dropped_limits = _filter_window(
-        shipping_limits, "shipping_limit_at", purchase_at, opened_at
+        shipping_limits, "shipping_limit_at", purchase_at, opened_at, fallback_when_empty=True
     )
-    events, _ = _filter_window(events, "event_at", purchase_at, opened_at)
+    events, _ = _filter_window(
+        events, "event_at", purchase_at, opened_at, fallback_when_empty=False
+    )
 
     # Extract entities
     item_ids: list[str] = []

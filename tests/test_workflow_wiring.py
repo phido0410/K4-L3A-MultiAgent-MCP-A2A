@@ -163,3 +163,48 @@ def test_strict_mode_still_raises_for_development(tmp_path: Path, monkeypatch) -
     trace = TraceWriter(tmp_path / "trace.jsonl", contracts)
     with pytest.raises(RuntimeError):
         asyncio.run(wf.solve_case(CASE, RefusingGateway(), trace))
+
+
+def test_a_lone_out_of_window_event_is_not_resurrected() -> None:
+    """Dữ liệu thật L3A_CASE_010: đơn giao đúng hạn, event delivered_late là nhiễu.
+
+    Case chỉ có đúng MỘT event và nó nằm ngoài cửa sổ. Nếu bộ lọc fallback về
+    danh sách gốc khi lọc hết, event nhiễu sống lại và case bị kết luận
+    late_delivery_logistics thay vì unsupported_claim.
+    """
+    from datetime import datetime
+
+    from student_agent.agents.shipment_agent import _filter_window
+
+    events = [
+        {
+            "event_at": "2018-05-17T09:00:00-03:00",
+            "event_type": "delivered_late",
+            "actor": "logistics_provider",
+            "status": "confirmed",
+        }
+    ]
+    purchase = datetime.fromisoformat("2017-12-29T09:00:00-03:00")
+    opened = datetime.fromisoformat("2018-01-10T09:00:00-03:00")
+
+    kept, dropped = _filter_window(
+        events, "event_at", purchase, opened, fallback_when_empty=False
+    )
+    assert kept == []
+    assert len(dropped) == 1
+
+
+def test_shipping_limits_still_fall_back_when_all_are_out_of_window() -> None:
+    """Ngược lại, hạn bàn giao cần ít nhất một dòng mới tính được seller trễ."""
+    from datetime import datetime
+
+    from student_agent.agents.shipment_agent import _filter_window
+
+    limits = [{"shipping_limit_at": "2018-05-05T09:00:00-03:00", "seller_id": "s1"}]
+    purchase = datetime.fromisoformat("2017-12-29T09:00:00-03:00")
+    opened = datetime.fromisoformat("2018-01-10T09:00:00-03:00")
+
+    kept, _ = _filter_window(
+        limits, "shipping_limit_at", purchase, opened, fallback_when_empty=True
+    )
+    assert len(kept) == 1
