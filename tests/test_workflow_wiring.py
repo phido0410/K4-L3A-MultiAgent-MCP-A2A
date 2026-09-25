@@ -122,3 +122,44 @@ def test_item_filter_falls_back_instead_of_dropping_everything() -> None:
     kept, dropped = filter_case_items(rows, purchase, opened)
     assert len(kept) == 1
     assert len(dropped) == 1
+
+
+def test_a_broken_case_never_crashes_the_batch(tmp_path: Path, monkeypatch) -> None:
+    """cli.py::_run không bắt exception: một case ném lỗi là mất cả 100 output.
+
+    Workflow phải hạ case hỏng về bản an toàn, hợp schema, thay vì raise.
+    """
+    import student_agent.workflow as wf
+
+    def explode(*args, **kwargs):
+        raise RuntimeError("lỗi giả lập trong coordinator")
+
+    monkeypatch.setattr(wf, "_synthesize", explode)
+    monkeypatch.setattr(wf, "STRICT_VERIFY", False)
+
+    contracts = Contracts(ROOT / "contracts" / "schemas")
+    trace = TraceWriter(tmp_path / "trace.jsonl", contracts)
+    output = asyncio.run(wf.solve_case(CASE, RefusingGateway(), trace))
+
+    contracts.validate_output(output, "degraded")
+    assert output["case_id"] == CASE["case_id"]
+    assert output["assessment"]["primary_issue"] == "insufficient_evidence"
+    assert output["financial_resolution"]["recommended_refund_brl"] == 0.0
+
+
+def test_strict_mode_still_raises_for_development(tmp_path: Path, monkeypatch) -> None:
+    """DAY09_STRICT_VERIFY=1 giữ nguyên hành vi ném lỗi khi đang phát triển."""
+    import pytest
+
+    import student_agent.workflow as wf
+
+    def explode(*args, **kwargs):
+        raise RuntimeError("lỗi giả lập")
+
+    monkeypatch.setattr(wf, "_synthesize", explode)
+    monkeypatch.setattr(wf, "STRICT_VERIFY", True)
+
+    contracts = Contracts(ROOT / "contracts" / "schemas")
+    trace = TraceWriter(tmp_path / "trace.jsonl", contracts)
+    with pytest.raises(RuntimeError):
+        asyncio.run(wf.solve_case(CASE, RefusingGateway(), trace))
