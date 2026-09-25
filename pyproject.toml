@@ -9,6 +9,7 @@ description = "Starter kit for the Day09 L3A Multi-Agent MCP + A2A competition"
 requires-python = ">=3.11"
 dependencies = [
     "httpx2>=2,<3",
+    "h2>=4,<5",  # bắt buộc: MCP streamable-http cần HTTP/2, xem mcp_gateway.py
     "jsonschema[format]>=4.25,<5",
     "mcp>=2,<3",
     "python-dotenv>=1.1,<2",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -42,14 +43,36 @@ class EvidenceGateway:
         return evidence
 
 
+def _build_http_client(team_api_key: str) -> httpx2.AsyncClient:
+    """Tạo HTTP client cho MCP, ưu tiên HTTP/2.
+
+    Transport streamable-http giữ một SSE stream mở đồng thời với các POST gửi
+    request. Trên HTTP/1.1 việc đó cần hai kết nối TCP cùng lúc, và kết nối thứ
+    hai bị chặn trên hạ tầng của cuộc thi — biểu hiện là `httpx2.ConnectTimeout`
+    ngay khi gọi tool đầu tiên, dù `initialize` đã thành công.
+
+    HTTP/2 ghép mọi luồng vào một kết nối nên không còn vấn đề. Cần gói `h2`;
+    nếu thiếu thì lùi về HTTP/1.1 kèm cảnh báo thay vì hỏng hẳn.
+    """
+    headers = {"Authorization": f"Bearer {team_api_key}"}
+    timeout = httpx2.Timeout(300.0, connect=30.0, write=30.0, pool=30.0)
+    try:
+        return httpx2.AsyncClient(headers=headers, timeout=timeout, http2=True)
+    except ImportError:
+        print(
+            "CẢNH BÁO: thiếu gói 'h2' nên phải dùng HTTP/1.1; "
+            "tool call nhiều khả năng sẽ ConnectTimeout. Chạy: pip install -e '.[dev]'",
+            file=sys.stderr,
+        )
+        return httpx2.AsyncClient(headers=headers, timeout=timeout)
+
+
 @asynccontextmanager
 async def connect_gateway(
     endpoint: str, team_api_key: str, contracts: Contracts
 ) -> AsyncIterator[EvidenceGateway]:
-    headers = {"Authorization": f"Bearer {team_api_key}"}
-    timeout = httpx2.Timeout(300.0, connect=30.0, write=30.0, pool=30.0)
     async with (
-        httpx2.AsyncClient(headers=headers, timeout=timeout) as http_client,
+        _build_http_client(team_api_key) as http_client,
         streamable_http_client(endpoint, http_client=http_client) as (read_stream, write_stream),
         ClientSession(read_stream, write_stream) as session,
     ):

@@ -63,21 +63,33 @@ async def run(case_ids: list[str], as_json: bool) -> int:
             if as_json:
                 print(json.dumps(output, ensure_ascii=False, indent=2))
                 continue
+
             a = output["assessment"]
             f = output["financial_resolution"]
+            refs = len(output["evidence_refs"])
+
+            # Không có evidence nghĩa là MCP hỏng, KHÔNG phải case khó.
+            # Đây là lỗi, không được báo xanh.
+            if refs == 0:
+                failures += 1
+                mark = "✗"
+            else:
+                mark = "✓"
             print(
-                f"✓ {case_id}  claim={claimed:<24} issue={a['primary_issue']:<24} "
+                f"{mark} {case_id}  claim={claimed:<24} issue={a['primary_issue']:<24} "
                 f"status={a['case_status']:<20} conf={a['confidence']:.2f} "
                 f"refund={f['recommended_refund_brl']:>8.2f} "
-                f"refs={len(output['evidence_refs'])}  {output['resolution_actions']}"
+                f"refs={refs}  {output['resolution_actions']}"
             )
 
+    total = len(case_ids)
     print()
     if failures:
-        print(f"KẾT QUẢ: ĐỎ — {failures}/{len(case_ids)} case lỗi")
+        print(f"KẾT QUẢ: ĐỎ — {failures}/{total} case không lấy được evidence hoặc lỗi.")
+        print("Mọi case ra insufficient_evidence với refs=0 nghĩa là kết nối MCP hỏng,")
+        print("không phải luật nghiệp vụ sai. Kiểm tra gói 'h2' đã cài chưa.")
     else:
-        total = len(case_ids)
-        print(f"KẾT QUẢ: XANH — {total}/{total} case chạy được, output hợp lệ schema")
+        print(f"KẾT QUẢ: XANH — {total}/{total} case có evidence thật và output hợp lệ schema")
     return 1 if failures else 0
 
 

@@ -208,6 +208,8 @@ Slide cũng ghi **"Thưởng Điểm Top 10 Cuối Buổi"**.
 | 2026-09-25 | Phi | Merge nhánh `Bao` và `cuongquoc_2A202602469`, viết lớp tích hợp `ScopedGateway` | 57 test xanh. Agent của hai bạn chạy nguyên không phải sửa |
 | 2026-09-25 | Phi | **Tìm và sửa bug `order_total_brl` nhân đôi** trong `order_agent.py` | `get_order_items` trả lẫn dòng ngoài cửa sổ case; cộng hết làm `PAY_DUPLICATE` và `PAY_SPLIT_VALID` không bao giờ khớp |
 | 2026-09-25 | Phi | Đối chiếu slide ban tổ chức, sửa kế hoạch D1–D7 thành 6 pha / 240 phút | Xem mục 5 và R-10 |
+| 2026-09-25 | Phi | **Tìm ra nguyên nhân `ConnectTimeout`: HTTP/1.1.** Bật HTTP/2, thêm `h2` vào dependencies | Trước đó chẩn đoán sai là giới hạn session. Sau khi sửa: 5/5 case smoke test có evidence thật |
+| 2026-09-25 | Phi | Sửa `smoke_cases.py` báo xanh giả — `refs=0` giờ tính là ĐỎ | Bản trước báo XANH dù cả 5 case đều không lấy được evidence |
 | | | _TODO_ | |
 
 ---
@@ -251,7 +253,7 @@ Ghi lại mọi quyết định có thể bị hỏi lại khi chấm. Không gh
 | R-01 | ~~`test_release_safety.py` FAIL~~ | ✅ **Đã xử lý 2026-09-25** | Đổi sang kiểm tra payload không được git theo dõi; 10/10 test xanh | Phi |
 | R-02 | `.env.example` trỏ endpoint production, README hướng dẫn `127.0.0.1` | Thấp | Dùng giá trị trong `.env.example` | Phi |
 | R-03 | ~~Chưa biết tool profile `l3a`~~ | ✅ **Đã xử lý 2026-09-25** | Xác nhận 10 tool, ghi ở `PHAN_CONG.md` mục 4.6 và cấu hình vào `a2a.py::TOOL_SCOPES` | Phi |
-| R-07 | **Gateway giới hạn session đồng thời trên mỗi Team API Key.** Session không `DELETE` sẽ giữ slot, mọi kết nối sau treo tới hết timeout | Trung bình — tự hồi phục sau 5–10 phút | `day09 mcp-tools` và `day09 run` hoạt động bình thường khi không có session treo. Quy ước: **không ai chạy lệnh gọi MCP khi người khác đang chạy**; bị timeout thì chờ, đừng thử lại liên tục | Cả nhóm |
+| R-07 | ~~`ConnectTimeout` khi gọi tool MCP~~ | ✅ **Đã xử lý 2026-09-25 — nguyên nhân thật là HTTP/1.1** | Transport streamable-http giữ SSE stream mở song song với POST → cần 2 kết nối TCP cùng lúc trên HTTP/1.1, kết nối thứ hai bị hạ tầng cuộc thi chặn. Bật `http2=True` trong `mcp_gateway.py` và thêm `h2` vào dependencies. Chẩn đoán "giới hạn session" trước đó là **sai** | Phi |
 | R-08 | ~~Chưa biết cấu trúc `data`~~ | ✅ **Đã xử lý 2026-09-25** | Khảo sát `L3A_CASE_001`, ghi vào `docs/mcp-evidence-shapes.md`. Còn `get_refund_timeline` chưa có mẫu (case 001 không có refund) — Quốc khảo sát ở Q1 | Phi |
 | R-10 | **Tên tool trong slide ban tổ chức không khớp gateway thật.** Slide ghi `get_payment`, `lookup_tracking`, `lookup_order`, `reconcile_payment` — không tool nào trong số này tồn tại | Thấp với nhóm ta (đã discovery), cao với nhóm khác | Dùng danh sách 10 tool thật ở `PHAN_CONG.md` mục 4.6. Slide chỉ mang tính minh hoạ | Cả nhóm |
 | R-11 | Nếu `day09 run` bị throttle giữa chừng khi chạy 100 case thì mất thời gian pha 5 | Trung bình | Chỉ một người chạy, không ai gọi MCP song song. Nộp bản chạy được sớm rồi cải thiện, vì được nộp lại mỗi 120 giây | Phi |
