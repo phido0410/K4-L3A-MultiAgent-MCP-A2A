@@ -1,0 +1,100 @@
+{
+  "schema_version": "day09-l3a-output-v2",
+  "case_id": "L3A_CASE_037",
+  "assessment": {
+    "primary_issue": "duplicate_charge",
+    "case_status": "action_required",
+    "confidence": 0.95
+  },
+  "affected_entities": {
+    "order_ids": [
+      "b90e46cdc30adec2f0fa041984341170"
+    ],
+    "item_ids": [
+      "item-b90e46cdc30a"
+    ],
+    "seller_ids": [
+      "seller-b90e46cdc30a"
+    ],
+    "payment_references": [
+      "b90e46cdc30adec2f0fa041984341170:1",
+      "b90e46cdc30adec2f0fa041984341170:2"
+    ],
+    "shipment_ids": []
+  },
+  "claim_assessments": [
+    {
+      "claim_id": "claim-037-a",
+      "verdict": "supported",
+      "confidence": 0.95,
+      "evidence_refs": [
+        "ev_rgD2XLcLOSnX4lABNiIH6-1EAwUT7Xjn",
+        "ev_O8UOA2DlPfG0ze21RKXmTPiOURam7q_9",
+        "ev_uVhncZdmrL8j12Mi8oiViOuD7wyHvhPw",
+        "ev_KgZcPI8QxQO20Huch5gY5BUeL9AP2WdM",
+        "ev_XDBNchPjxbU4b99UYqd2oqG8o15ydk-p",
+        "ev_Ix_qQ-ogzjDowH3f2BBouXzAGLEOc3Xr"
+      ]
+    },
+    {
+      "claim_id": "claim-037-b",
+      "verdict": "supported",
+      "confidence": 0.95,
+      "evidence_refs": [
+        "ev_rgD2XLcLOSnX4lABNiIH6-1EAwUT7Xjn",
+        "ev_O8UOA2DlPfG0ze21RKXmTPiOURam7q_9",
+        "ev_uVhncZdmrL8j12Mi8oiViOuD7wyHvhPw",
+        "ev_KgZcPI8QxQO20Huch5gY5BUeL9AP2WdM",
+        "ev_XDBNchPjxbU4b99UYqd2oqG8o15ydk-p",
+        "ev_Ix_qQ-ogzjDowH3f2BBouXzAGLEOc3Xr"
+      ]
+    }
+  ],
+  "root_cause_analysis": {
+    "ranked_causes": [
+      {
+        "cause_code": "DUPLICATE_PAYMENT_CAPTURE",
+        "rank": 1
+      }
+    ],
+    "responsible_parties": [
+      {
+        "party_type": "payment_provider",
+        "party_id": null
+      }
+    ]
+  },
+  "evidence_refs": [
+    "ev_rgD2XLcLOSnX4lABNiIH6-1EAwUT7Xjn",
+    "ev_O8UOA2DlPfG0ze21RKXmTPiOURam7q_9",
+    "ev_uVhncZdmrL8j12Mi8oiViOuD7wyHvhPw",
+    "ev_KgZcPI8QxQO20Huch5gY5BUeL9AP2WdM",
+    "ev_XDBNchPjxbU4b99UYqd2oqG8o15ydk-p",
+    "ev_Ix_qQ-ogzjDowH3f2BBouXzAGLEOc3Xr"
+  ],
+  "data_conflicts": [
+    {
+      "field": "order_item_freight_value",
+      "sources": [
+        "item",
+        "order"
+      ],
+      "selected_source": "item",
+      "resolution_code": "ITEM_ROW_OUTSIDE_CASE_WINDOW"
+    }
+  ],
+  "financial_resolution": {
+    "currency": "BRL",
+    "recommended_refund_brl": 64.0,
+    "refund_lines": [
+      {
+        "reason_code": "DUPLICATE_CHARGE_EXCESS",
+        "amount_brl": 64.0,
+        "entity_id": "b90e46cdc30adec2f0fa041984341170"
+      }
+    ]
+  },
+  "resolution_actions": [
+    "refund_duplicate_charge"
+  ]
+}

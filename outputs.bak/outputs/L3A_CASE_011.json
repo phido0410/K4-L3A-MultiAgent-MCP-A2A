@@ -1,0 +1,99 @@
+{
+  "schema_version": "day09-l3a-output-v2",
+  "case_id": "L3A_CASE_011",
+  "assessment": {
+    "primary_issue": "canceled_order_paid",
+    "case_status": "action_required",
+    "confidence": 0.95
+  },
+  "affected_entities": {
+    "order_ids": [
+      "2636a02ee7de9590df86a4c24b739c49"
+    ],
+    "item_ids": [
+      "item-2636a02ee7de"
+    ],
+    "seller_ids": [
+      "seller-2636a02ee7de"
+    ],
+    "payment_references": [
+      "2636a02ee7de9590df86a4c24b739c49:1"
+    ],
+    "shipment_ids": []
+  },
+  "claim_assessments": [
+    {
+      "claim_id": "claim-011-a",
+      "verdict": "supported",
+      "confidence": 0.95,
+      "evidence_refs": [
+        "ev_20OyIaznb1xEYOCwa0aEGswD2e48ToN4",
+        "ev_-O4qYOQTcOblqHJtSjJHKu-W0w8V6CRN",
+        "ev_1vQVac6tQR9wbImD0OvEOy4EjVOilEVM",
+        "ev_HKVEkG3kz2bxF759q6RxFDN9d0tDRZZf",
+        "ev_TNOCcGfw3INnjG4Lt1Lsn2H0aeX4JnPV",
+        "ev_APNAT2wNDxtO-3wGgFnPXiPH02Xo-JVg"
+      ]
+    },
+    {
+      "claim_id": "claim-011-b",
+      "verdict": "supported",
+      "confidence": 0.95,
+      "evidence_refs": [
+        "ev_20OyIaznb1xEYOCwa0aEGswD2e48ToN4",
+        "ev_-O4qYOQTcOblqHJtSjJHKu-W0w8V6CRN",
+        "ev_1vQVac6tQR9wbImD0OvEOy4EjVOilEVM",
+        "ev_HKVEkG3kz2bxF759q6RxFDN9d0tDRZZf",
+        "ev_TNOCcGfw3INnjG4Lt1Lsn2H0aeX4JnPV",
+        "ev_APNAT2wNDxtO-3wGgFnPXiPH02Xo-JVg"
+      ]
+    }
+  ],
+  "root_cause_analysis": {
+    "ranked_causes": [
+      {
+        "cause_code": "ORDER_CANCELED_AFTER_PAYMENT",
+        "rank": 1
+      }
+    ],
+    "responsible_parties": [
+      {
+        "party_type": "platform",
+        "party_id": null
+      }
+    ]
+  },
+  "evidence_refs": [
+    "ev_20OyIaznb1xEYOCwa0aEGswD2e48ToN4",
+    "ev_-O4qYOQTcOblqHJtSjJHKu-W0w8V6CRN",
+    "ev_1vQVac6tQR9wbImD0OvEOy4EjVOilEVM",
+    "ev_HKVEkG3kz2bxF759q6RxFDN9d0tDRZZf",
+    "ev_TNOCcGfw3INnjG4Lt1Lsn2H0aeX4JnPV",
+    "ev_APNAT2wNDxtO-3wGgFnPXiPH02Xo-JVg"
+  ],
+  "data_conflicts": [
+    {
+      "field": "order_item_freight_value",
+      "sources": [
+        "item",
+        "order"
+      ],
+      "selected_source": "item",
+      "resolution_code": "ITEM_ROW_OUTSIDE_CASE_WINDOW"
+    }
+  ],
+  "financial_resolution": {
+    "currency": "BRL",
+    "recommended_refund_brl": 79.0,
+    "refund_lines": [
+      {
+        "reason_code": "CANCELED_ORDER_FULL_REFUND",
+        "amount_brl": 79.0,
+        "entity_id": "2636a02ee7de9590df86a4c24b739c49"
+      }
+    ]
+  },
+  "resolution_actions": [
+    "issue_refund"
+  ]
+}

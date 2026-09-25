@@ -1,0 +1,99 @@
+{
+  "schema_version": "day09-l3a-output-v2",
+  "case_id": "L3A_CASE_074",
+  "assessment": {
+    "primary_issue": "late_delivery_logistics",
+    "case_status": "action_required",
+    "confidence": 0.95
+  },
+  "affected_entities": {
+    "order_ids": [
+      "6560fb10610771449cb0463c5ba12199"
+    ],
+    "item_ids": [
+      "item-6560fb106107"
+    ],
+    "seller_ids": [
+      "seller-6560fb106107"
+    ],
+    "payment_references": [
+      "6560fb10610771449cb0463c5ba12199:1"
+    ],
+    "shipment_ids": []
+  },
+  "claim_assessments": [
+    {
+      "claim_id": "claim-074-a",
+      "verdict": "supported",
+      "confidence": 0.95,
+      "evidence_refs": [
+        "ev_p1SyfC4Z2Wueu5uFa-_1kch3qBE9qFel",
+        "ev_pLtt0Bhj8Uj548YjByW1fJadCsK20LDc",
+        "ev_JivZnlFmYKDzYchhJ9_jg_x83B6wR5k6",
+        "ev_gYxHJ5CDAXXc03LYRq9XGMcoEXgusoXm",
+        "ev_iDgXXu9-ZOJ9h-IrDeaqZfywEbe5c88V",
+        "ev_QVbaLHl8u54dpC6cFd393R4IYdTITdqw"
+      ]
+    },
+    {
+      "claim_id": "claim-074-b",
+      "verdict": "supported",
+      "confidence": 0.95,
+      "evidence_refs": [
+        "ev_p1SyfC4Z2Wueu5uFa-_1kch3qBE9qFel",
+        "ev_pLtt0Bhj8Uj548YjByW1fJadCsK20LDc",
+        "ev_JivZnlFmYKDzYchhJ9_jg_x83B6wR5k6",
+        "ev_gYxHJ5CDAXXc03LYRq9XGMcoEXgusoXm",
+        "ev_iDgXXu9-ZOJ9h-IrDeaqZfywEbe5c88V",
+        "ev_QVbaLHl8u54dpC6cFd393R4IYdTITdqw"
+      ]
+    }
+  ],
+  "root_cause_analysis": {
+    "ranked_causes": [
+      {
+        "cause_code": "CARRIER_TRANSIT_DELAY",
+        "rank": 1
+      }
+    ],
+    "responsible_parties": [
+      {
+        "party_type": "logistics_provider",
+        "party_id": null
+      }
+    ]
+  },
+  "evidence_refs": [
+    "ev_p1SyfC4Z2Wueu5uFa-_1kch3qBE9qFel",
+    "ev_pLtt0Bhj8Uj548YjByW1fJadCsK20LDc",
+    "ev_JivZnlFmYKDzYchhJ9_jg_x83B6wR5k6",
+    "ev_gYxHJ5CDAXXc03LYRq9XGMcoEXgusoXm",
+    "ev_iDgXXu9-ZOJ9h-IrDeaqZfywEbe5c88V",
+    "ev_QVbaLHl8u54dpC6cFd393R4IYdTITdqw"
+  ],
+  "data_conflicts": [
+    {
+      "field": "order_item_freight_value",
+      "sources": [
+        "item",
+        "order"
+      ],
+      "selected_source": "item",
+      "resolution_code": "ITEM_ROW_OUTSIDE_CASE_WINDOW"
+    }
+  ],
+  "financial_resolution": {
+    "currency": "BRL",
+    "recommended_refund_brl": 16.0,
+    "refund_lines": [
+      {
+        "reason_code": "LATE_DELIVERY_FREIGHT_REFUND",
+        "amount_brl": 16.0,
+        "entity_id": "6560fb10610771449cb0463c5ba12199"
+      }
+    ]
+  },
+  "resolution_actions": [
+    "refund_freight"
+  ]
+}

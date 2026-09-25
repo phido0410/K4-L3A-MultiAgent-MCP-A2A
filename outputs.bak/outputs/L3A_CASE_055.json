@@ -1,0 +1,94 @@
+{
+  "schema_version": "day09-l3a-output-v2",
+  "case_id": "L3A_CASE_055",
+  "assessment": {
+    "primary_issue": "valid_split_payment",
+    "case_status": "no_action",
+    "confidence": 0.95
+  },
+  "affected_entities": {
+    "order_ids": [
+      "3a20bcc250e5404ca717dfa90e8a9c05"
+    ],
+    "item_ids": [
+      "item-3a20bcc250e5"
+    ],
+    "seller_ids": [
+      "seller-3a20bcc250e5"
+    ],
+    "payment_references": [
+      "3a20bcc250e5404ca717dfa90e8a9c05:1",
+      "3a20bcc250e5404ca717dfa90e8a9c05:2"
+    ],
+    "shipment_ids": []
+  },
+  "claim_assessments": [
+    {
+      "claim_id": "claim-055-a",
+      "verdict": "supported",
+      "confidence": 0.95,
+      "evidence_refs": [
+        "ev_GfaYmSaExeiGyHfy_RYFvSbE1NYd9bvO",
+        "ev_1csNlG8QMsZvMNGK_sZF_bKxZPzecH9P",
+        "ev_v2nQwFQ5t31XH6kwMIXOtKmzUNkRs3w8",
+        "ev_RBhfX-TzKWSssfyICNczAzZwdREdXipr",
+        "ev_QzskrN_PHd7y22rdHIrcRuWogc16Rhiy",
+        "ev_0umtybRYXkaL7J54AJ22KKL7Pifc_0S9"
+      ]
+    },
+    {
+      "claim_id": "claim-055-b",
+      "verdict": "unsupported",
+      "confidence": 0.95,
+      "evidence_refs": [
+        "ev_GfaYmSaExeiGyHfy_RYFvSbE1NYd9bvO",
+        "ev_1csNlG8QMsZvMNGK_sZF_bKxZPzecH9P",
+        "ev_v2nQwFQ5t31XH6kwMIXOtKmzUNkRs3w8",
+        "ev_RBhfX-TzKWSssfyICNczAzZwdREdXipr",
+        "ev_QzskrN_PHd7y22rdHIrcRuWogc16Rhiy",
+        "ev_0umtybRYXkaL7J54AJ22KKL7Pifc_0S9"
+      ]
+    }
+  ],
+  "root_cause_analysis": {
+    "ranked_causes": [
+      {
+        "cause_code": "SPLIT_PAYMENT_AS_DESIGNED",
+        "rank": 1
+      }
+    ],
+    "responsible_parties": [
+      {
+        "party_type": "customer",
+        "party_id": null
+      }
+    ]
+  },
+  "evidence_refs": [
+    "ev_GfaYmSaExeiGyHfy_RYFvSbE1NYd9bvO",
+    "ev_1csNlG8QMsZvMNGK_sZF_bKxZPzecH9P",
+    "ev_v2nQwFQ5t31XH6kwMIXOtKmzUNkRs3w8",
+    "ev_RBhfX-TzKWSssfyICNczAzZwdREdXipr",
+    "ev_QzskrN_PHd7y22rdHIrcRuWogc16Rhiy",
+    "ev_0umtybRYXkaL7J54AJ22KKL7Pifc_0S9"
+  ],
+  "data_conflicts": [
+    {
+      "field": "order_item_freight_value",
+      "sources": [
+        "item",
+        "order"
+      ],
+      "selected_source": "item",
+      "resolution_code": "ITEM_ROW_OUTSIDE_CASE_WINDOW"
+    }
+  ],
+  "financial_resolution": {
+    "currency": "BRL",
+    "recommended_refund_brl": 0.0,
+    "refund_lines": []
+  },
+  "resolution_actions": [
+    "document_no_action"
+  ]
+}

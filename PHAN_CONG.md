@@ -117,14 +117,15 @@ Nếu lỗi auth (401/403) → nhắn Phi, đừng tự sửa key.
 
 ---
 
-## 3. Bốn điều cấm tuyệt đối
+## 3. Năm điều cấm tuyệt đối
 
-Vi phạm 1 trong 4 điều này thì **case bị 0 điểm** (hard gate), không cứu được:
+Vi phạm 1 trong 5 điều này thì **case bị 0 điểm** (hard gate), không cứu được:
 
 1. **Không bịa, không sửa `evidence_ref`.** Ref chỉ được lấy nguyên văn từ response MCP. Format `ev_...`.
 2. **Không dùng evidence của case này cho case khác.** Không cache ref qua các case. Server audit từng call.
-3. **Không đoán dữ liệu.** Không có evidence thì kết luận là `insufficient_evidence`, không được suy diễn.
-4. **Không commit `.env` hoặc paste API key** vào chat, issue, commit message, log.
+3. **Không chạy lệnh gọi MCP khi người khác đang chạy.** `evidence_ref` phải khớp **team, run VÀ case** (`contracts/scoring/scoring-policy-v2.json`). Hai người chạy chồng làm nhập nhằng phạm vi `run` → hard gate `cross_scope_evidence_ref`. Áp dụng cho cả `day09 run`, `day09 mcp-tools`, `scripts/smoke_cases.py`, `scripts/dump_case.py`.
+4. **Không đoán dữ liệu.** Không có evidence thì kết luận là `insufficient_evidence`, không được suy diễn.
+5. **Không commit `.env` hoặc paste API key** vào chat, issue, commit message, log.
 
 Thêm: **không đoán tên tool MCP**. Danh sách 10 tool đã xác nhận ở mục 4.6, dùng đúng tên trong đó.
 

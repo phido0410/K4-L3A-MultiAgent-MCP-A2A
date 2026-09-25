@@ -1,0 +1,96 @@
+{
+  "schema_version": "day09-l3a-output-v2",
+  "case_id": "L3A_CASE_038",
+  "assessment": {
+    "primary_issue": "refund_pending",
+    "case_status": "needs_investigation",
+    "confidence": 0.95
+  },
+  "affected_entities": {
+    "order_ids": [
+      "6b27933c6a46e3d66203137ad1fdb678"
+    ],
+    "item_ids": [
+      "item-6b27933c6a46"
+    ],
+    "seller_ids": [
+      "seller-6b27933c6a46"
+    ],
+    "payment_references": [
+      "6b27933c6a46e3d66203137ad1fdb678:1"
+    ],
+    "shipment_ids": []
+  },
+  "claim_assessments": [
+    {
+      "claim_id": "claim-038-a",
+      "verdict": "supported",
+      "confidence": 0.95,
+      "evidence_refs": [
+        "ev_UN-Y5KWGJ8E4EdqVg7k5Hssbn1tFa8Fj",
+        "ev_5Cc-gkyD-Vyj0RDozfmhsEu4hkO7UJtS",
+        "ev_G-Zy5aBqO-fvqtwracYZGvHuQpvCCUpr",
+        "ev_GTAKKaWNokkfHXj9BrGKJpc38zIHa6b5",
+        "ev_K31gTytXf9xRNBmZeYWuUpauJmdgBdGf",
+        "ev_PhsE_brDciaosvjHxqGcT_S8Hg8zBnYF",
+        "ev_hqn8UQe7Lr_SbFoIl51-owGPaSMl-0nq"
+      ]
+    },
+    {
+      "claim_id": "claim-038-b",
+      "verdict": "unsupported",
+      "confidence": 0.95,
+      "evidence_refs": [
+        "ev_UN-Y5KWGJ8E4EdqVg7k5Hssbn1tFa8Fj",
+        "ev_5Cc-gkyD-Vyj0RDozfmhsEu4hkO7UJtS",
+        "ev_G-Zy5aBqO-fvqtwracYZGvHuQpvCCUpr",
+        "ev_GTAKKaWNokkfHXj9BrGKJpc38zIHa6b5",
+        "ev_K31gTytXf9xRNBmZeYWuUpauJmdgBdGf",
+        "ev_PhsE_brDciaosvjHxqGcT_S8Hg8zBnYF",
+        "ev_hqn8UQe7Lr_SbFoIl51-owGPaSMl-0nq"
+      ]
+    }
+  ],
+  "root_cause_analysis": {
+    "ranked_causes": [
+      {
+        "cause_code": "REFUND_NOT_SETTLED",
+        "rank": 1
+      }
+    ],
+    "responsible_parties": [
+      {
+        "party_type": "payment_provider",
+        "party_id": null
+      }
+    ]
+  },
+  "evidence_refs": [
+    "ev_UN-Y5KWGJ8E4EdqVg7k5Hssbn1tFa8Fj",
+    "ev_5Cc-gkyD-Vyj0RDozfmhsEu4hkO7UJtS",
+    "ev_G-Zy5aBqO-fvqtwracYZGvHuQpvCCUpr",
+    "ev_GTAKKaWNokkfHXj9BrGKJpc38zIHa6b5",
+    "ev_K31gTytXf9xRNBmZeYWuUpauJmdgBdGf",
+    "ev_PhsE_brDciaosvjHxqGcT_S8Hg8zBnYF",
+    "ev_hqn8UQe7Lr_SbFoIl51-owGPaSMl-0nq"
+  ],
+  "data_conflicts": [
+    {
+      "field": "order_item_freight_value",
+      "sources": [
+        "item",
+        "order"
+      ],
+      "selected_source": "item",
+      "resolution_code": "ITEM_ROW_OUTSIDE_CASE_WINDOW"
+    }
+  ],
+  "financial_resolution": {
+    "currency": "BRL",
+    "recommended_refund_brl": 0.0,
+    "refund_lines": []
+  },
+  "resolution_actions": [
+    "monitor_refund"
+  ]
+}

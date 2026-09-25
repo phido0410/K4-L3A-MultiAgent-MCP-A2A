@@ -1,0 +1,108 @@
+{
+  "schema_version": "day09-l3a-output-v2",
+  "case_id": "L3A_CASE_076",
+  "assessment": {
+    "primary_issue": "payment_mismatch",
+    "case_status": "action_required",
+    "confidence": 0.95
+  },
+  "affected_entities": {
+    "order_ids": [
+      "9b4fc5c379134e1329bd48641ba285e3"
+    ],
+    "item_ids": [
+      "item-9b4fc5c37913"
+    ],
+    "seller_ids": [
+      "seller-9b4fc5c37913"
+    ],
+    "payment_references": [
+      "9b4fc5c379134e1329bd48641ba285e3:1"
+    ],
+    "shipment_ids": []
+  },
+  "claim_assessments": [
+    {
+      "claim_id": "claim-076-a",
+      "verdict": "supported",
+      "confidence": 0.95,
+      "evidence_refs": [
+        "ev_bW_bzmlS3Tvg1A9SKBS2R6fqAvFmXZNo",
+        "ev_jhDjp3141jeDP91eebTlHy9xYbkgPq0V",
+        "ev_vkshGFvxXQyHFNGFZ9Yzwi_rWS-u5jGu",
+        "ev_8rM1SVGwxGvwyGlmEPywhGVoJJviRJno",
+        "ev_zG5YOLukOZbwHcZu_ASKPwQBHUdcmQl9",
+        "ev_Bxt26PVQ-ITmxpqGfC59ZJxEOOba3BQ8"
+      ]
+    },
+    {
+      "claim_id": "claim-076-b",
+      "verdict": "supported",
+      "confidence": 0.95,
+      "evidence_refs": [
+        "ev_bW_bzmlS3Tvg1A9SKBS2R6fqAvFmXZNo",
+        "ev_jhDjp3141jeDP91eebTlHy9xYbkgPq0V",
+        "ev_vkshGFvxXQyHFNGFZ9Yzwi_rWS-u5jGu",
+        "ev_8rM1SVGwxGvwyGlmEPywhGVoJJviRJno",
+        "ev_zG5YOLukOZbwHcZu_ASKPwQBHUdcmQl9",
+        "ev_Bxt26PVQ-ITmxpqGfC59ZJxEOOba3BQ8"
+      ]
+    }
+  ],
+  "root_cause_analysis": {
+    "ranked_causes": [
+      {
+        "cause_code": "PAYMENT_TOTAL_MISMATCH",
+        "rank": 1
+      }
+    ],
+    "responsible_parties": [
+      {
+        "party_type": "payment_provider",
+        "party_id": null
+      }
+    ]
+  },
+  "evidence_refs": [
+    "ev_bW_bzmlS3Tvg1A9SKBS2R6fqAvFmXZNo",
+    "ev_jhDjp3141jeDP91eebTlHy9xYbkgPq0V",
+    "ev_vkshGFvxXQyHFNGFZ9Yzwi_rWS-u5jGu",
+    "ev_8rM1SVGwxGvwyGlmEPywhGVoJJviRJno",
+    "ev_zG5YOLukOZbwHcZu_ASKPwQBHUdcmQl9",
+    "ev_Bxt26PVQ-ITmxpqGfC59ZJxEOOba3BQ8"
+  ],
+  "data_conflicts": [
+    {
+      "field": "order_item_freight_value",
+      "sources": [
+        "item",
+        "order"
+      ],
+      "selected_source": "item",
+      "resolution_code": "ITEM_ROW_OUTSIDE_CASE_WINDOW"
+    },
+    {
+      "field": "payment_total_brl",
+      "sources": [
+        "order",
+        "payment"
+      ],
+      "selected_source": "payment",
+      "resolution_code": "PAYMENT_RECONCILIATION_OPEN"
+    }
+  ],
+  "financial_resolution": {
+    "currency": "BRL",
+    "recommended_refund_brl": 35.0,
+    "refund_lines": [
+      {
+        "reason_code": "PAYMENT_MISMATCH_ADJUSTMENT",
+        "amount_brl": 35.0,
+        "entity_id": "9b4fc5c379134e1329bd48641ba285e3"
+      }
+    ]
+  },
+  "resolution_actions": [
+    "reconcile_payment"
+  ]
+}
