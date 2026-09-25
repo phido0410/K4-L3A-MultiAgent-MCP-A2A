@@ -38,11 +38,33 @@ from .trace import TraceWriter
 MAX_EVIDENCE_REFS = 30
 MAX_CLAIM_ASSESSMENTS = 5
 
+#: Tools that always hold a record for an in-scope order. If one of them fails, the
+#: gateway was degraded (the generic tool error hides the cause), so the case is retried
+#: instead of being concluded from partial evidence. get_refund_timeline is excluded: it
+#: legitimately errors when an order has no refund.
+CORE_TOOLS = frozenset({
+    "get_order", "get_order_items", "get_shipment_summary", "get_payment_timeline",
+    "get_policy",
+})
+
+
+class IncompleteEvidenceError(Exception):
+    """A core tool failed for this case; the caller should re-run it on a fresh session."""
+
 
 async def solve_case(
-    case: dict[str, Any], gateway: EvidenceGateway, trace: TraceWriter
+    case: dict[str, Any], gateway: EvidenceGateway, trace: TraceWriter, *, strict: bool = False
 ) -> dict[str, Any]:
+    """Solve one case.
+
+    With ``strict``, a failed core tool raises ``IncompleteEvidenceError`` before anything
+    is finalized, so the CLI can retry; the last attempt runs non-strict and accepts
+    whatever evidence exists.
+    """
     case_id = case["case_id"]
+    failed_tools = getattr(gateway, "failed_tools", None)
+    if failed_tools is not None:
+        failed_tools.clear()
     dispatcher = Dispatcher(case, gateway, trace)
 
     order = await dispatcher.run(
@@ -72,6 +94,11 @@ async def solve_case(
         ),
         handoff_to="verifier",
     )
+
+    if strict and failed_tools and CORE_TOOLS.intersection(failed_tools):
+        raise IncompleteEvidenceError(
+            f"{case_id}: core tools failed {sorted(CORE_TOOLS.intersection(failed_tools))}"
+        )
 
     findings = [*evidence_findings, policy]
     facts = collect_facts(findings)
@@ -201,7 +228,8 @@ def _assess_claims(
         elif topic == "requested_full_refund":
             verdict = _refund_claim_verdict(decision, refund_total, captured_total)
         elif topic == decision.primary_issue:
-            verdict = "supported"
+            # "unsupported_claim" means the evidence refutes the complaint.
+            verdict = "unsupported" if topic == "unsupported_claim" else "supported"
         else:
             verdict = "unsupported"
         result.append({

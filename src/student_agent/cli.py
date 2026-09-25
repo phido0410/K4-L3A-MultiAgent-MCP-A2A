@@ -5,14 +5,21 @@ import asyncio
 import json
 import sys
 from pathlib import Path
+from typing import Any
+
+import httpx2
 
 from .cases import load_case_set
 from .config import Settings
 from .contracts import Contracts
-from .mcp_gateway import connect_gateway
+from .mcp_gateway import EvidenceGateway, TransientGatewayError, connect_gateway
 from .submission import package_submission, validate_artifacts
 from .trace import TraceWriter
-from .workflow import solve_case
+from .workflow import IncompleteEvidenceError, solve_case
+
+MAX_CASE_ATTEMPTS = 3
+MAX_RECONNECTS = 25
+RECONNECT_DELAY_SECONDS = 5.0
 
 
 def _root(value: str) -> Path:
@@ -40,24 +47,68 @@ async def _run(root: Path) -> None:
     trace_path.unlink(missing_ok=True)
     trace = TraceWriter(trace_path, contracts)
 
-    async with connect_gateway(settings.mcp_endpoint, settings.team_api_key, contracts) as gateway:
-        discovered_tools = await gateway.list_tools()
-        if not discovered_tools:
-            raise RuntimeError("MCP Gateway returned no tools")
-        for case_id in case_set.case_ids:
-            case = case_set.cases[case_id]
-            trace.emit(case_id=case_id, event_type="case_received", actor="coordinator")
-            output = await solve_case(case, gateway, trace)
-            contracts.validate_output(output, f"outputs/{case_id}.json")
-            if output.get("case_id") != case_id:
-                raise ValueError(f"solver returned a mismatched case_id for {case_id}")
-            target = output_root / f"{case_id}.json"
-            temporary = target.with_suffix(".json.tmp")
-            temporary.write_text(
-                json.dumps(output, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-            )
-            temporary.replace(target)
-            trace.emit(case_id=case_id, event_type="case_finalized", actor="coordinator")
+    pending = list(case_set.case_ids)
+    attempts: dict[str, int] = dict.fromkeys(pending, 0)
+    reconnects = 0
+    while pending:
+        try:
+            async with connect_gateway(
+                settings.mcp_endpoint, settings.team_api_key, contracts
+            ) as gateway:
+                if not await gateway.list_tools():
+                    raise RuntimeError("MCP Gateway returned no tools")
+                while pending:
+                    case_id = pending[0]
+                    attempts[case_id] += 1
+                    strict = attempts[case_id] < MAX_CASE_ATTEMPTS
+                    mark = trace_path.stat().st_size if trace_path.exists() else 0
+                    try:
+                        await _solve_and_write(
+                            case_set.cases[case_id], gateway, trace, contracts, output_root,
+                            strict=strict,
+                        )
+                    except BaseException:
+                        # Drop the interrupted case's partial trace so a retry is clean.
+                        with trace_path.open("r+b") as handle:
+                            handle.truncate(mark)
+                        # Transport and incomplete-evidence failures reconnect and retry
+                        # this case; IncompleteEvidenceError is only raised in strict mode,
+                        # so the final attempt always lands. Anything else aborts the run.
+                        raise
+                    pending.pop(0)
+        except (
+            TransientGatewayError, IncompleteEvidenceError, OSError, httpx2.HTTPError,
+            BaseExceptionGroup,
+        ) as exc:
+            reconnects += 1
+            if reconnects > MAX_RECONNECTS:
+                raise RuntimeError(f"MCP connection kept failing: {exc!r}") from None
+            print(f"reconnecting ({reconnects}/{MAX_RECONNECTS}): {exc!r}"[:200], file=sys.stderr)
+            await asyncio.sleep(RECONNECT_DELAY_SECONDS)
+
+
+async def _solve_and_write(
+    case: dict[str, Any],
+    gateway: EvidenceGateway,
+    trace: TraceWriter,
+    contracts: Contracts,
+    output_root: Path,
+    *,
+    strict: bool,
+) -> None:
+    case_id = case["case_id"]
+    trace.emit(case_id=case_id, event_type="case_received", actor="coordinator")
+    output = await solve_case(case, gateway, trace, strict=strict)
+    contracts.validate_output(output, f"outputs/{case_id}.json")
+    if output.get("case_id") != case_id:
+        raise ValueError(f"solver returned a mismatched case_id for {case_id}")
+    target = output_root / f"{case_id}.json"
+    temporary = target.with_suffix(".json.tmp")
+    temporary.write_text(
+        json.dumps(output, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    temporary.replace(target)
+    trace.emit(case_id=case_id, event_type="case_finalized", actor="coordinator")
 
 
 def parser() -> argparse.ArgumentParser:

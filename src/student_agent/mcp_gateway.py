@@ -13,10 +13,21 @@ from mcp.client.streamable_http import streamable_http_client
 from .contracts import Contracts
 
 
+class TransientGatewayError(BaseException):
+    """The MCP transport failed (dropped stream, 5xx, timeout), not the tool itself.
+
+    Derives from BaseException on purpose: agents catch ``Exception`` to turn a missing
+    record into a signal, and a network hiccup must not be mistaken for missing data.
+    It propagates to the CLI, which reconnects and re-runs the case.
+    """
+
+
 class EvidenceGateway:
     def __init__(self, session: ClientSession, contracts: Contracts) -> None:
         self._session = session
         self._contracts = contracts
+        #: Tools whose call failed during the current case; reset by the coordinator.
+        self.failed_tools: list[str] = []
 
     async def list_tools(self) -> list[str]:
         response = await self._session.list_tools()
@@ -24,9 +35,14 @@ class EvidenceGateway:
 
     async def call(self, tool_name: str, *, case_id: str, **arguments: str) -> dict[str, Any]:
         payload = {"case_id": case_id, **arguments}
-        result = await self._session.call_tool(tool_name, arguments=payload)
+        try:
+            result = await self._session.call_tool(tool_name, arguments=payload)
+        except Exception as exc:
+            self.failed_tools.append(tool_name)
+            raise TransientGatewayError(f"{tool_name}: {type(exc).__name__}: {exc}") from exc
         is_error = getattr(result, "is_error", getattr(result, "isError", False))
         if is_error:
+            self.failed_tools.append(tool_name)
             message = " ".join(
                 block.text for block in result.content if getattr(block, "text", None)
             )
