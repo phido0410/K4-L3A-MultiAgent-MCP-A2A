@@ -1,0 +1,96 @@
+{
+  "schema_version": "day09-l3a-output-v2",
+  "case_id": "L3A_CASE_098",
+  "assessment": {
+    "primary_issue": "refund_pending",
+    "case_status": "needs_investigation",
+    "confidence": 0.95
+  },
+  "affected_entities": {
+    "order_ids": [
+      "b8ed89bd3f1fe72244f0f616acdc7da1"
+    ],
+    "item_ids": [
+      "item-b8ed89bd3f1f"
+    ],
+    "seller_ids": [
+      "seller-b8ed89bd3f1f"
+    ],
+    "payment_references": [
+      "b8ed89bd3f1fe72244f0f616acdc7da1:1"
+    ],
+    "shipment_ids": []
+  },
+  "claim_assessments": [
+    {
+      "claim_id": "claim-098-a",
+      "verdict": "supported",
+      "confidence": 0.95,
+      "evidence_refs": [
+        "ev_4xhUsAoEFNjKyvzZzJHfx_1ywjBNpX-h",
+        "ev_yEvLKfhi1Hx8eBuAaW6mtGMbUIrBo9rj",
+        "ev_a_V_bWN_eKe9JRkWE3AtbYefGc7zTgEp",
+        "ev_B5MFrisI_ydc7z471sUvvXR4Aw2IkXux",
+        "ev_p1dlm-hgz0AOR7OSv-jZ7eeM9z5pMUiS",
+        "ev_5HJh0tu50dZuGSv6No-DubHKxZgijlK1",
+        "ev_rMvC9G_rNDEc3OUZpO0fhOHgrdkF5OJR"
+      ]
+    },
+    {
+      "claim_id": "claim-098-b",
+      "verdict": "unsupported",
+      "confidence": 0.95,
+      "evidence_refs": [
+        "ev_4xhUsAoEFNjKyvzZzJHfx_1ywjBNpX-h",
+        "ev_yEvLKfhi1Hx8eBuAaW6mtGMbUIrBo9rj",
+        "ev_a_V_bWN_eKe9JRkWE3AtbYefGc7zTgEp",
+        "ev_B5MFrisI_ydc7z471sUvvXR4Aw2IkXux",
+        "ev_p1dlm-hgz0AOR7OSv-jZ7eeM9z5pMUiS",
+        "ev_5HJh0tu50dZuGSv6No-DubHKxZgijlK1",
+        "ev_rMvC9G_rNDEc3OUZpO0fhOHgrdkF5OJR"
+      ]
+    }
+  ],
+  "root_cause_analysis": {
+    "ranked_causes": [
+      {
+        "cause_code": "REFUND_NOT_SETTLED",
+        "rank": 1
+      }
+    ],
+    "responsible_parties": [
+      {
+        "party_type": "payment_provider",
+        "party_id": null
+      }
+    ]
+  },
+  "evidence_refs": [
+    "ev_4xhUsAoEFNjKyvzZzJHfx_1ywjBNpX-h",
+    "ev_yEvLKfhi1Hx8eBuAaW6mtGMbUIrBo9rj",
+    "ev_a_V_bWN_eKe9JRkWE3AtbYefGc7zTgEp",
+    "ev_B5MFrisI_ydc7z471sUvvXR4Aw2IkXux",
+    "ev_p1dlm-hgz0AOR7OSv-jZ7eeM9z5pMUiS",
+    "ev_5HJh0tu50dZuGSv6No-DubHKxZgijlK1",
+    "ev_rMvC9G_rNDEc3OUZpO0fhOHgrdkF5OJR"
+  ],
+  "data_conflicts": [
+    {
+      "field": "payment_total_brl",
+      "sources": [
+        "order",
+        "payment"
+      ],
+      "selected_source": "payment",
+      "resolution_code": "PAYMENT_RECONCILIATION_OPEN"
+    }
+  ],
+  "financial_resolution": {
+    "currency": "BRL",
+    "recommended_refund_brl": 0.0,
+    "refund_lines": []
+  },
+  "resolution_actions": [
+    "monitor_refund"
+  ]
+}

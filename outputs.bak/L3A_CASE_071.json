@@ -1,0 +1,89 @@
+{
+  "schema_version": "day09-l3a-output-v2",
+  "case_id": "L3A_CASE_071",
+  "assessment": {
+    "primary_issue": "canceled_order_paid",
+    "case_status": "action_required",
+    "confidence": 0.95
+  },
+  "affected_entities": {
+    "order_ids": [
+      "cc8778d76e567b45082b7f52bce23095"
+    ],
+    "item_ids": [
+      "item-cc8778d76e56"
+    ],
+    "seller_ids": [
+      "seller-cc8778d76e56"
+    ],
+    "payment_references": [
+      "cc8778d76e567b45082b7f52bce23095:1"
+    ],
+    "shipment_ids": []
+  },
+  "claim_assessments": [
+    {
+      "claim_id": "claim-071-a",
+      "verdict": "supported",
+      "confidence": 0.95,
+      "evidence_refs": [
+        "ev_PoOlfuPqFQ-gbFxay6zGWf4O-ZLN6aAu",
+        "ev_GQ16ipowEHPUHTu7GUzcIe4Uooa4ImeW",
+        "ev_g0Xwf5J0iKv6ZmZAWqpR8IA3mMk9oXlB",
+        "ev_yafhpl985s1JkY5PbH9MKI5s-39Jt8DQ",
+        "ev_wHAo8Xh1ZnCd50M8URVkgRoaU2NV87wF",
+        "ev_NTaZV8KA41saVXHrYxBYpuUaK00SxbH7"
+      ]
+    },
+    {
+      "claim_id": "claim-071-b",
+      "verdict": "supported",
+      "confidence": 0.95,
+      "evidence_refs": [
+        "ev_PoOlfuPqFQ-gbFxay6zGWf4O-ZLN6aAu",
+        "ev_GQ16ipowEHPUHTu7GUzcIe4Uooa4ImeW",
+        "ev_g0Xwf5J0iKv6ZmZAWqpR8IA3mMk9oXlB",
+        "ev_yafhpl985s1JkY5PbH9MKI5s-39Jt8DQ",
+        "ev_wHAo8Xh1ZnCd50M8URVkgRoaU2NV87wF",
+        "ev_NTaZV8KA41saVXHrYxBYpuUaK00SxbH7"
+      ]
+    }
+  ],
+  "root_cause_analysis": {
+    "ranked_causes": [
+      {
+        "cause_code": "ORDER_CANCELED_AFTER_PAYMENT",
+        "rank": 1
+      }
+    ],
+    "responsible_parties": [
+      {
+        "party_type": "platform",
+        "party_id": null
+      }
+    ]
+  },
+  "evidence_refs": [
+    "ev_PoOlfuPqFQ-gbFxay6zGWf4O-ZLN6aAu",
+    "ev_GQ16ipowEHPUHTu7GUzcIe4Uooa4ImeW",
+    "ev_g0Xwf5J0iKv6ZmZAWqpR8IA3mMk9oXlB",
+    "ev_yafhpl985s1JkY5PbH9MKI5s-39Jt8DQ",
+    "ev_wHAo8Xh1ZnCd50M8URVkgRoaU2NV87wF",
+    "ev_NTaZV8KA41saVXHrYxBYpuUaK00SxbH7"
+  ],
+  "data_conflicts": [],
+  "financial_resolution": {
+    "currency": "BRL",
+    "recommended_refund_brl": 79.0,
+    "refund_lines": [
+      {
+        "reason_code": "CANCELED_ORDER_FULL_REFUND",
+        "amount_brl": 79.0,
+        "entity_id": "cc8778d76e567b45082b7f52bce23095"
+      }
+    ]
+  },
+  "resolution_actions": [
+    "issue_refund"
+  ]
+}

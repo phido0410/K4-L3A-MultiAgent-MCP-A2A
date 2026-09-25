@@ -17,6 +17,30 @@ def _parse_iso(timestamp: str | None) -> datetime | None:
         return None
 
 
+def _filter_window(
+    rows: list[dict[str, Any]],
+    field: str,
+    start: datetime | None,
+    end: datetime | None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Giữ lại dòng có mốc thời gian nằm trong cửa sổ của case.
+
+    Dòng thiếu mốc được giữ (không đủ căn cứ để loại). Nếu lọc xong không còn
+    gì thì trả lại nguyên danh sách — thà dùng dữ liệu nhiễu còn hơn mù hoàn toàn.
+    """
+    if start is None and end is None:
+        return rows, []
+    kept: list[dict[str, Any]] = []
+    dropped: list[dict[str, Any]] = []
+    for row in rows:
+        moment = _parse_iso(row.get(field))
+        inside = moment is None or (
+            (start is None or moment >= start) and (end is None or moment <= end)
+        )
+        (kept if inside else dropped).append(row)
+    return (kept, dropped) if kept else (rows, [])
+
+
 async def analyze_shipment(
     case: dict[str, Any],
     gateway: EvidenceGateway,
@@ -94,6 +118,18 @@ async def analyze_shipment(
     estimated_delivery_at = ship_data.get("estimated_delivery_at")
     shipping_limits: list[dict[str, Any]] = ship_data.get("shipping_limits", [])
     events: list[dict[str, Any]] = ship_data.get("events", [])
+
+    # Gateway trả lẫn dòng của kịch bản khác. Nếu không lọc, một `shipping_limit_at`
+    # nhiễu sớm hơn sẽ làm `min()` bên dưới báo seller trễ cho đơn giao đúng hạn —
+    # đó là lý do `late_delivery_seller` từng bị dự đoán 25/100 thay vì ~10.
+    purchase_at = _parse_iso(
+        order_finding.facts.get("order_purchase_timestamp") if order_finding else None
+    )
+    opened_at = _parse_iso(case.get("opened_at"))
+    shipping_limits, dropped_limits = _filter_window(
+        shipping_limits, "shipping_limit_at", purchase_at, opened_at
+    )
+    events, _ = _filter_window(events, "event_at", purchase_at, opened_at)
 
     # Extract entities
     item_ids: list[str] = []
@@ -204,6 +240,16 @@ async def analyze_shipment(
             signals.append("SHIP_LATE_LOGISTICS")
         else:
             signals.append("SHIP_ON_TIME")
+
+    if dropped_limits:
+        conflicts.append(
+            {
+                "field": "shipping_limit_at",
+                "sources": ["shipment", "item"],
+                "selected_source": "shipment",
+                "resolution_code": "LIMIT_ROW_OUTSIDE_CASE_WINDOW",
+            }
+        )
 
     # Determine ranked causes and responsible parties (B6)
     ranked_causes: list[dict[str, Any]] = []

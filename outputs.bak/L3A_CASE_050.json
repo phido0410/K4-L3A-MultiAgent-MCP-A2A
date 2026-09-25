@@ -1,0 +1,103 @@
+{
+  "schema_version": "day09-l3a-output-v2",
+  "case_id": "L3A_CASE_050",
+  "assessment": {
+    "primary_issue": "late_delivery_seller",
+    "case_status": "action_required",
+    "confidence": 0.95
+  },
+  "affected_entities": {
+    "order_ids": [
+      "af0bbb47f125381ce9f3597dc70ef07b"
+    ],
+    "item_ids": [
+      "item-af0bbb47f125"
+    ],
+    "seller_ids": [
+      "seller-af0bbb47f125"
+    ],
+    "payment_references": [
+      "af0bbb47f125381ce9f3597dc70ef07b:1"
+    ],
+    "shipment_ids": []
+  },
+  "claim_assessments": [
+    {
+      "claim_id": "claim-050-a",
+      "verdict": "unsupported",
+      "confidence": 0.95,
+      "evidence_refs": [
+        "ev_gotw9Zorr43aySnNmcKfwEP56DtXz-6L",
+        "ev_oaUDcIkKdaA_035T_lGB7LnKm8JxS8Es",
+        "ev_fsbVN1b-WOv63Js6nwEJGOE-NiZ5eDNI",
+        "ev_k3FGatjuyKwPjYUiSFhv6ZYxZTMNCihp",
+        "ev_cVCQZ5e-pJ2HRfYIpvo7LdG-xMpfxalJ",
+        "ev_a-20vxfhgyYheJxitveG9nlRUjPRvEuI"
+      ]
+    },
+    {
+      "claim_id": "claim-050-b",
+      "verdict": "supported",
+      "confidence": 0.95,
+      "evidence_refs": [
+        "ev_gotw9Zorr43aySnNmcKfwEP56DtXz-6L",
+        "ev_oaUDcIkKdaA_035T_lGB7LnKm8JxS8Es",
+        "ev_fsbVN1b-WOv63Js6nwEJGOE-NiZ5eDNI",
+        "ev_k3FGatjuyKwPjYUiSFhv6ZYxZTMNCihp",
+        "ev_cVCQZ5e-pJ2HRfYIpvo7LdG-xMpfxalJ",
+        "ev_a-20vxfhgyYheJxitveG9nlRUjPRvEuI"
+      ]
+    }
+  ],
+  "root_cause_analysis": {
+    "ranked_causes": [
+      {
+        "cause_code": "SELLER_HANDOVER_DELAY",
+        "rank": 1
+      },
+      {
+        "cause_code": "CARRIER_TRANSIT_DELAY",
+        "rank": 2
+      }
+    ],
+    "responsible_parties": [
+      {
+        "party_type": "seller",
+        "party_id": "seller-af0bbb47f125"
+      }
+    ]
+  },
+  "evidence_refs": [
+    "ev_gotw9Zorr43aySnNmcKfwEP56DtXz-6L",
+    "ev_oaUDcIkKdaA_035T_lGB7LnKm8JxS8Es",
+    "ev_fsbVN1b-WOv63Js6nwEJGOE-NiZ5eDNI",
+    "ev_k3FGatjuyKwPjYUiSFhv6ZYxZTMNCihp",
+    "ev_cVCQZ5e-pJ2HRfYIpvo7LdG-xMpfxalJ",
+    "ev_a-20vxfhgyYheJxitveG9nlRUjPRvEuI"
+  ],
+  "data_conflicts": [
+    {
+      "field": "order_item_freight_value",
+      "sources": [
+        "item",
+        "order"
+      ],
+      "selected_source": "item",
+      "resolution_code": "ITEM_ROW_OUTSIDE_CASE_WINDOW"
+    }
+  ],
+  "financial_resolution": {
+    "currency": "BRL",
+    "recommended_refund_brl": 18.0,
+    "refund_lines": [
+      {
+        "reason_code": "LATE_DELIVERY_FREIGHT_REFUND",
+        "amount_brl": 18.0,
+        "entity_id": "af0bbb47f125381ce9f3597dc70ef07b"
+      }
+    ]
+  },
+  "resolution_actions": [
+    "refund_freight"
+  ]
+}

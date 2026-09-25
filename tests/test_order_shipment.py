@@ -71,8 +71,10 @@ def test_order_agent_status_canceled() -> None:
         assert finding.entities["order_ids"] == ["ord_001"]
         assert finding.entities["item_ids"] == ["item_1"]
         assert finding.entities["seller_ids"] == ["seller_1"]
-        assert len(finding.evidence) == 3
-        assert len(trace.events) == 3
+        # get_sellers đã bỏ: dữ liệu seller không dùng cho kết luận nào, gọi và
+        # cite nó chỉ làm tụt evidence precision (F1) và tốn call budget.
+        assert len(finding.evidence) == 2
+        assert len(trace.events) == 2
 
     asyncio.run(_test())
 

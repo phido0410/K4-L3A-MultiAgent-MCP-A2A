@@ -65,6 +65,8 @@ class Decision:
     ranked_causes: list[dict[str, Any]] = field(default_factory=list)
     responsible_parties: list[dict[str, Any]] = field(default_factory=list)
     evidence_complete: bool = True
+    #: Có tín hiệu cạnh tranh cho một issue khác — kết luận kém chắc chắn hơn.
+    ambiguous: bool = False
 
 
 def decide(signals: set[str], facts: dict[str, Any]) -> Decision:
@@ -89,6 +91,7 @@ def decide(signals: set[str], facts: dict[str, Any]) -> Decision:
 
     return Decision(
         primary_issue=issue,
+        ambiguous=_is_ambiguous(issue, signals),
         case_status=policy_rule.get("case_status") or CASE_STATUS_BY_ISSUE[issue],
         ranked_causes=_ranked_causes(issue, signals),
         responsible_parties=(
@@ -136,6 +139,22 @@ def _select_issue(signals: set[str], has_order: bool, paid: bool, settled: bool)
     return "insufficient_evidence"
 
 
+#: Tín hiệu cạnh tranh: nếu cùng bật với issue đã chọn thì kết luận kém chắc.
+COMPETING_SIGNALS: dict[str, set[str]] = {
+    "late_delivery_seller": {"SHIP_LATE_LOGISTICS"},
+    "late_delivery_logistics": {"SHIP_LATE_SELLER"},
+    "payment_mismatch": {"PAY_DUPLICATE", "PAY_SPLIT_VALID"},
+    "duplicate_charge": {"PAY_SPLIT_VALID"},
+    "valid_split_payment": {"PAY_DUPLICATE", "PAY_MISMATCH"},
+}
+
+
+def _is_ambiguous(issue: str, signals: set[str]) -> bool:
+    if signals & {"SHIP_TIMELINE_CONFLICT", "SHIP_TIMELINE_INCOMPLETE"}:
+        return True
+    return bool(signals & COMPETING_SIGNALS.get(issue, set()))
+
+
 def _ranked_causes(issue: str, signals: set[str]) -> list[dict[str, Any]]:
     causes = [{"cause_code": PRIMARY_CAUSE_BY_ISSUE[issue], "rank": 1}]
     if issue == "late_delivery_logistics" and "SHIP_LATE_SELLER" in signals:
@@ -156,17 +175,27 @@ def _responsible_parties(issue: str, facts: dict[str, Any]) -> list[dict[str, An
     return [{"party_type": party_type, "party_id": party_id}]
 
 
-def confidence_for(decision: Decision, findings_confidence: list[float]) -> float:
-    """Confidence hiệu chỉnh: điểm calibration là 1 − (đúng − confidence)².
+#: Trần confidence theo mức chắc chắn của kết luận.
+#: Điểm calibration là 1 − (đúng − confidence)², cực đại khi confidence bằng
+#: đúng xác suất kết luận đúng. Một giá trị phẳng cho mọi case luôn dưới tối ưu:
+#: quá cao thì case sai bị phạt nặng, quá thấp thì case đúng không được hưởng.
+CONFIDENCE_CLEAR = 0.92
+CONFIDENCE_AMBIGUOUS = 0.72
+CONFIDENCE_INCOMPLETE = 0.55
+CONFIDENCE_INSUFFICIENT = 0.30
 
-    Không bao giờ trả 1.0: một case luôn còn khả năng sai. Thiếu evidence thì
-    hạ trần xuống rõ rệt thay vì giữ nguyên rồi đoán.
-    """
+
+def confidence_for(decision: Decision, findings_confidence: list[float]) -> float:
+    """Confidence phản ánh mức chắc chắn thật của kết luận, không phải hằng số."""
     if not findings_confidence:
-        return 0.3
-    base = sum(findings_confidence) / len(findings_confidence)
+        return CONFIDENCE_INSUFFICIENT
     if decision.primary_issue == "insufficient_evidence":
-        return round(min(base, 0.4), 2)
+        return CONFIDENCE_INSUFFICIENT
     if not decision.evidence_complete:
-        return round(min(base, 0.6), 2)
-    return round(min(max(base, 0.05), 0.95), 2)
+        return CONFIDENCE_INCOMPLETE
+    if decision.ambiguous:
+        return CONFIDENCE_AMBIGUOUS
+
+    # Agent nào cũng kém tự tin thì kết luận cũng không thể chắc.
+    agent_floor = min(findings_confidence)
+    return round(min(CONFIDENCE_CLEAR, max(agent_floor, 0.4)), 2)

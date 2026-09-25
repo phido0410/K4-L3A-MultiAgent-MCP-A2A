@@ -198,23 +198,9 @@ async def analyze_order(
     facts["seller_ids"] = seller_ids
     facts["primary_seller_id"] = seller_ids[0] if seller_ids else None
 
-    # 4. Fetch sellers info if available
-    try:
-        sellers_res = await gateway.call("get_sellers", case_id=case_id, order_id=claimed_order_id)
-        sellers_ref = sellers_res["evidence_ref"]
-        trace.emit(
-            case_id=case_id,
-            event_type="tool_result_consumed",
-            actor="order-agent",
-            tool_name="get_sellers",
-            evidence_refs=[sellers_ref],
-        )
-        evidence_items.append(
-            EvidenceItem(evidence_ref=sellers_ref, domain="seller", tool_name="get_sellers")
-        )
-        facts["sellers"] = sellers_res.get("data", [])
-    except Exception:
-        facts["sellers"] = []
+    # get_sellers đã bỏ: seller_id lấy được từ get_order_items, dữ liệu seller
+    # không dùng cho kết luận nào. Gọi và cite nó chỉ làm tụt evidence precision
+    # (điểm evidence là F1) và tốn call budget.
 
     # 5. Map order_status to standardized signals
     if order_status == "canceled":
