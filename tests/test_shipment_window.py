@@ -74,6 +74,23 @@ def test_distractor_late_event_outside_window_is_ignored() -> None:
     assert finding.signals == ["SHIP_ON_TIME"]
 
 
+def test_late_event_before_the_deadline_is_ignored() -> None:
+    # L3A_CASE_080: delivered before the estimate, yet a "late" event sits in the window.
+    early = {
+        "order_id": "ord_005", "event_at": "2018-04-28T09:00:00-03:00",
+        "event_type": "delivered_late", "actor": "logistics_provider", "status": "confirmed",
+    }
+    assert run(shipment(["2018-04-26T09:00:00-03:00"], [early])).signals == ["SHIP_ON_TIME"]
+
+
+def test_late_event_after_the_deadline_counts() -> None:
+    late = {
+        "order_id": "ord_005", "event_at": "2018-05-04T09:00:00-03:00",
+        "event_type": "delivered_late", "actor": "logistics_provider", "status": "confirmed",
+    }
+    assert run(shipment(["2018-04-26T09:00:00-03:00"], [late])).signals == ["SHIP_LATE_LOGISTICS"]
+
+
 def test_in_window_seller_delay_still_detected() -> None:
     finding = run(shipment(["2018-04-24T09:00:00-03:00", "2018-01-10T09:00:00-03:00"], []))
     assert finding.signals == ["SHIP_LATE_SELLER"]

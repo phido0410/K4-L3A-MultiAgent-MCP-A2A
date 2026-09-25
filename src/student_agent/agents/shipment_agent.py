@@ -186,19 +186,19 @@ async def analyze_shipment(
         diff_sec = (dt_cust - dt_est).total_seconds()
         logistics_delay_days = round(max(0.0, diff_sec / 86400.0), 2)
 
-    # Check confirmed audit events
-    seller_event_confirmed = any(
-        e.get("event_type") == "delivered_late"
-        and e.get("actor") == "seller"
-        and e.get("status") == "confirmed"
-        for e in events
-    )
-    logistics_event_confirmed = any(
-        e.get("event_type") == "delivered_late"
-        and e.get("actor") == "logistics_provider"
-        and e.get("status") == "confirmed"
-        for e in events
-    )
+    # Check confirmed audit events. Lateness can only be observed once the deadline has
+    # passed, so a "delivered_late" event dated before its deadline is noise.
+    def _late_event(actor: str, deadline: datetime | None) -> bool:
+        return any(
+            e.get("event_type") == "delivered_late"
+            and e.get("actor") == actor
+            and e.get("status") == "confirmed"
+            and (deadline is None or (_parse_iso(e.get("event_at")) or deadline) > deadline)
+            for e in events
+        )
+
+    seller_event_confirmed = _late_event("seller", min_limit)
+    logistics_event_confirmed = _late_event("logistics_provider", dt_est)
 
     # Signal evaluation (B5)
     # Check impossible timeline conflict (e.g. delivered to customer before handed to carrier)
