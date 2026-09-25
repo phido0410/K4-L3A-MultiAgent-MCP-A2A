@@ -17,6 +17,14 @@ def _parse_iso(timestamp: str | None) -> datetime | None:
         return None
 
 
+def _in_window(moment: datetime | None, start: datetime | None, end: datetime | None) -> bool:
+    if moment is None:
+        return False
+    if start is not None and moment < start:
+        return False
+    return not (end is not None and moment > end)
+
+
 async def analyze_shipment(
     case: dict[str, Any],
     gateway: EvidenceGateway,
@@ -92,8 +100,22 @@ async def analyze_shipment(
     delivered_carrier_at = ship_data.get("delivered_carrier_at")
     delivered_customer_at = ship_data.get("delivered_customer_at")
     estimated_delivery_at = ship_data.get("estimated_delivery_at")
-    shipping_limits: list[dict[str, Any]] = ship_data.get("shipping_limits", [])
-    events: list[dict[str, Any]] = ship_data.get("events", [])
+    # The gateway mixes in distractor rows from other scenarios whose timestamps fall
+    # outside [order_purchase_timestamp, opened_at]; they must not drive delay signals.
+    purchase_at = _parse_iso(
+        order_finding.facts.get("order_purchase_timestamp") if order_finding else None
+    )
+    opened_at = _parse_iso(case.get("opened_at"))
+    all_limits: list[dict[str, Any]] = ship_data.get("shipping_limits") or []
+    all_events: list[dict[str, Any]] = ship_data.get("events") or []
+    shipping_limits = [
+        lim for lim in all_limits
+        if _in_window(_parse_iso(lim.get("shipping_limit_at")), purchase_at, opened_at)
+    ]
+    events = [
+        e for e in all_events
+        if _in_window(_parse_iso(e.get("event_at")), purchase_at, opened_at)
+    ]
 
     # Extract entities
     item_ids: list[str] = []
@@ -242,6 +264,9 @@ async def analyze_shipment(
     facts["delivered_customer_at"] = delivered_customer_at
     facts["estimated_delivery_at"] = estimated_delivery_at
     facts["shipping_limits"] = shipping_limits
+    facts["excluded_shipment_rows"] = (
+        len(all_limits) - len(shipping_limits) + len(all_events) - len(events)
+    )
     facts["seller_delay_days"] = seller_delay_days
     facts["logistics_delay_days"] = logistics_delay_days
     facts["events"] = events

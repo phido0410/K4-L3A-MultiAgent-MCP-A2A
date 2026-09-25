@@ -31,7 +31,7 @@ from .domain.findings import (
     collect_signals,
     merge_entities,
 )
-from .domain.money import compute_refund
+from .domain.money import TOLERANCE_BRL, compute_refund, to_decimal
 from .mcp_gateway import EvidenceGateway
 from .trace import TraceWriter
 
@@ -100,7 +100,10 @@ async def solve_case(
             "confidence": confidence,
         },
         "affected_entities": merge_entities(findings),
-        "claim_assessments": _assess_claims(case, decision, evidence_refs, confidence),
+        "claim_assessments": _assess_claims(
+            case, decision, evidence_refs, confidence,
+            refund_total=refund_total, captured_total=facts.get("captured_total_brl"),
+        ),
         "root_cause_analysis": {
             "ranked_causes": decision.ranked_causes,
             "responsible_parties": decision.responsible_parties,
@@ -161,15 +164,22 @@ def _assess_claims(
     decision: rules.Decision,
     evidence_refs: list[str],
     confidence: float,
+    *,
+    refund_total: float = 0.0,
+    captured_total: Any = None,
 ) -> list[dict[str, Any]]:
-    """Đối chiếu từng claim của khách với kết luận dựa trên evidence."""
+    """Đối chiếu từng claim của khách với kết luận dựa trên evidence.
+
+    `requested_full_refund` chỉ `supported` khi số hoàn bằng toàn bộ tiền đã thu;
+    hoàn một phần (phí ship, phần thu trùng...) là `partially_supported`.
+    """
     result: list[dict[str, Any]] = []
     for claim in case["customer_request"].get("claims", [])[:MAX_CLAIM_ASSESSMENTS]:
         topic = claim.get("topic")
         if decision.primary_issue == "insufficient_evidence":
             verdict = "insufficient_evidence"
         elif topic == "requested_full_refund":
-            verdict = "supported" if decision.case_status == "action_required" else "unsupported"
+            verdict = _refund_claim_verdict(decision, refund_total, captured_total)
         elif topic == decision.primary_issue:
             verdict = "supported"
         else:
@@ -181,6 +191,17 @@ def _assess_claims(
             "evidence_refs": evidence_refs[:20],
         })
     return result
+
+
+def _refund_claim_verdict(
+    decision: rules.Decision, refund_total: float, captured_total: Any
+) -> str:
+    if decision.case_status != "action_required" or refund_total <= 0:
+        return "unsupported"
+    captured = to_decimal(captured_total)
+    if captured is not None and to_decimal(refund_total) < captured - TOLERANCE_BRL:
+        return "partially_supported"
+    return "supported"
 
 
 def _actions_for(decision: rules.Decision, policy: Finding, refund_total: float) -> list[str]:

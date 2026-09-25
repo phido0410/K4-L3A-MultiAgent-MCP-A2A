@@ -161,16 +161,10 @@ async def analyze_order(
     purchase_at = _parse_time(facts.get("order_purchase_timestamp"))
     opened_at = _parse_time(case.get("opened_at"))
     items_data, dropped_items = filter_case_items(items_data, purchase_at, opened_at)
+    # Rows outside the case window are injected noise, not a disagreement between two
+    # authoritative sources, so they are recorded as a fact rather than a data conflict.
     conflicts: list[dict[str, Any]] = []
-    if dropped_items:
-        conflicts.append(
-            {
-                "field": "order_item_freight_value",
-                "sources": ["item", "order"],
-                "selected_source": "item",
-                "resolution_code": "ITEM_ROW_OUTSIDE_CASE_WINDOW",
-            }
-        )
+    facts["excluded_item_rows"] = len(dropped_items)
 
     total_decimal = Decimal("0.00")
     item_ids: list[str] = []
