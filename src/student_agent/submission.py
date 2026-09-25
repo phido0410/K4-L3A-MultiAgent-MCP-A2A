@@ -90,6 +90,57 @@ def validate_artifacts(
 #: Tỉ lệ case được phép không có evidence trước khi coi là hỏng kết nối.
 MAX_EMPTY_EVIDENCE_RATIO = 0.15
 
+#: Tỉ lệ case được phép dùng chung một luồng trace y hệt nhau.
+#: Một điều tra thật sinh ra luồng khác nhau theo từng case; nhiều case trùng
+#: luồng tuyệt đối là dấu hiệu agent chạy rỗng, và server gắn cờ spam.
+MAX_IDENTICAL_TRACE_RATIO = 0.40
+
+
+def _skip_health_checks() -> bool:
+    return os.getenv("DAY09_SKIP_HEALTH_CHECKS", "").strip() == "1" or (
+        os.getenv("DAY09_ALLOW_EMPTY_EVIDENCE", "").strip() == "1"
+    )
+
+
+def check_trace_health(trace_lines: list[str]) -> None:
+    """Chặn đóng gói khi quá nhiều case có luồng trace giống hệt nhau.
+
+    Bỏ `event_id` và `occurred_at` rồi so chữ ký luồng của từng case. Khi MCP
+    chết, mọi case chạy đúng một kịch bản rỗng giống nhau; server coi đó là
+    trace lặp/spam và cho 0 điểm cả bài.
+    """
+    if _skip_health_checks():
+        return
+    shapes: dict[str, list[tuple[Any, ...]]] = {}
+    for line in trace_lines:
+        event = json.loads(line)
+        shapes.setdefault(event["case_id"], []).append(
+            (
+                event["event_type"],
+                event["actor"],
+                event.get("target"),
+                event.get("decision_code"),
+                len(event.get("evidence_refs") or []),
+            )
+        )
+    if not shapes:
+        return
+    counts: dict[tuple[Any, ...], int] = {}
+    for flow in shapes.values():
+        key = tuple(flow)
+        counts[key] = counts.get(key, 0) + 1
+    worst = max(counts.values())
+    ratio = worst / len(shapes)
+    if ratio <= MAX_IDENTICAL_TRACE_RATIO:
+        return
+    raise ValueError(
+        f"{worst}/{len(shapes)} case có luồng trace giống hệt nhau ({ratio:.0%}), "
+        f"chỉ {len(counts)} luồng khác nhau cho toàn bộ case. "
+        f"Server coi đây là trace lặp/spam và cho 0 điểm cả bài nộp.\n"
+        f"Nguyên nhân thường gặp: kết nối MCP chết nên mọi case chạy cùng một "
+        f"kịch bản rỗng. Chạy lại day09 run và kiểm tra evidence trước khi nộp."
+    )
+
 
 def check_evidence_health(outputs: dict[str, Any]) -> None:
     """Chặn đóng gói khi phần lớn case không có evidence.
@@ -102,7 +153,7 @@ def check_evidence_health(outputs: dict[str, Any]) -> None:
     Đây là cửa cuối trước khi tạo ZIP. Đặt DAY09_ALLOW_EMPTY_EVIDENCE=1 để bỏ
     qua nếu thật sự có ý định nộp như vậy.
     """
-    if os.getenv("DAY09_ALLOW_EMPTY_EVIDENCE", "").strip() == "1":
+    if _skip_health_checks():
         return
     empty = [case_id for case_id, out in outputs.items() if not out.get("evidence_refs")]
     ratio = len(empty) / max(len(outputs), 1)
@@ -125,6 +176,7 @@ def package_submission(root: Path, destination: Path) -> Path:
     contracts = Contracts(root / "contracts" / "schemas")
     outputs, trace_lines = validate_artifacts(root, case_set, contracts)
     check_evidence_health(outputs)
+    check_trace_health(trace_lines)
     manifest = build_manifest(case_set)
     contracts.validate_manifest(manifest)
 
