@@ -1,126 +1,165 @@
-"""Tính tiền hoàn và bất biến tài chính — CHỦ SỞ HỮU: Phạm Cường Quốc.
+"""Refund arithmetic and money invariants. Pure functions, no MCP calls.
 
-Module thuần tính toán, không gọi MCP, nên test được không cần mạng.
-`check_money_invariants` được `agents/verifier.py` gọi trước khi finalize.
+Amounts are summed as ``Decimal`` and converted to ``float`` (2 decimals) only at the
+output boundary, so rounding noise never leaks into comparisons.
 """
 
 from __future__ import annotations
 
-from decimal import ROUND_HALF_UP, Decimal
+from collections.abc import Iterable, Mapping
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 
-#: Dung sai khi so khớp số tiền, tính bằng BRL. TODO(D4): nhóm chốt lại.
-MONEY_TOLERANCE_BRL = 0.01
+TOLERANCE_BRL = Decimal("0.01")
+CENT = Decimal("0.01")
+MAX_REFUND_LINES = 10
 
-#: Danh sách đóng các mã lý do hoàn tiền. Verifier chặn giá trị ngoài danh sách.
-REASON_CODES = frozenset({
-    "CANCELED_ORDER_FULL_REFUND",
-    "UNAVAILABLE_ORDER_FULL_REFUND",
-    "DUPLICATE_CHARGE_EXCESS",
-    "LATE_DELIVERY_FREIGHT_REFUND",
-    "PAYMENT_MISMATCH_ADJUSTMENT",
-    "REFUND_RETRY_OUTSTANDING",
-})
-
-#: Danh sách đóng các hành động xử lý.
-RESOLUTION_ACTIONS = frozenset({
-    "ISSUE_FULL_REFUND",
-    "ISSUE_PARTIAL_REFUND",
-    "RETRY_REFUND",
-    "ESCALATE_TO_SELLER",
-    "ESCALATE_TO_LOGISTICS",
-    "ESCALATE_TO_PAYMENT_PROVIDER",
-    "REQUEST_MORE_EVIDENCE",
-    "NO_ACTION",
-})
-
-
-#: Mã lý do tương ứng với từng primary_issue.
-REASON_BY_ISSUE: dict[str, str] = {
+# Closed vocabulary for financial_resolution.refund_lines[].reason_code.
+ISSUE_REASON_CODES: dict[str, str] = {
     "canceled_order_paid": "CANCELED_ORDER_FULL_REFUND",
     "unavailable_order_paid": "UNAVAILABLE_ORDER_FULL_REFUND",
-    "duplicate_charge": "DUPLICATE_CHARGE_EXCESS",
     "late_delivery_seller": "LATE_DELIVERY_FREIGHT_REFUND",
     "late_delivery_logistics": "LATE_DELIVERY_FREIGHT_REFUND",
+    "duplicate_charge": "DUPLICATE_CHARGE_EXCESS",
     "payment_mismatch": "PAYMENT_MISMATCH_ADJUSTMENT",
-    "refund_failed": "REFUND_RETRY_OUTSTANDING",
-    "refund_pending": "REFUND_RETRY_OUTSTANDING",
+    "refund_failed": "FAILED_REFUND_RETRY",
 }
+REASON_CODES: frozenset[str] = frozenset(ISSUE_REASON_CODES.values())
+
+# Policy actions that pay money back; a positive refund needs one, no_action forbids them.
+REFUND_ACTIONS: frozenset[str] = frozenset(
+    {"issue_refund", "refund_freight", "refund_duplicate_charge", "reconcile_payment",
+     "retry_refund"}
+)
 
 
-def brl(value: float | Decimal | str) -> float:
-    """Làm tròn về 2 chữ số thập phân theo kiểu tiền tệ."""
-    return float(Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+def to_decimal(value: Any) -> Decimal | None:
+    """Parse an MCP money value ("44.50", 44.5, Decimal) into Decimal; None if unusable."""
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        # str() first so floats such as 79.0 do not carry binary noise into Decimal.
+        result = Decimal(str(value).strip())
+    except (InvalidOperation, ValueError):
+        return None
+    return result if result.is_finite() else None
+
+
+def quantize(value: Decimal) -> Decimal:
+    return value.quantize(CENT, rounding=ROUND_HALF_UP)
+
+
+def to_brl(value: Decimal) -> float:
+    return float(quantize(value))
+
+
+def sum_brl(values: Iterable[Any]) -> Decimal:
+    total = Decimal("0")
+    for value in values:
+        amount = to_decimal(value)
+        if amount is not None:
+            total += amount
+    return total
+
+
+def amounts_match(left: Any, right: Any, tolerance: Decimal = TOLERANCE_BRL) -> bool:
+    a, b = to_decimal(left), to_decimal(right)
+    return a is not None and b is not None and abs(a - b) <= tolerance
 
 
 def compute_refund(
+    order_total_brl: Any,
+    captured_total_brl: Any,
+    refunded_total_brl: Any,
+    signals: Iterable[str],
+    policy: Mapping[str, Any] | None,
+    *,
     primary_issue: str,
-    facts: dict[str, Any],
-    signals: set[str],
+    entity_id: str | None = None,
 ) -> tuple[float, list[dict[str, Any]]]:
-    """TODO(Quốc): trả về (recommended_refund_brl, refund_lines).
+    """Return ``(recommended_refund_brl, refund_lines)`` for the decided primary issue.
 
-    Quy tắc mong đợi:
-
-    - canceled_order_paid / unavailable_order_paid -> hoàn toàn bộ captured_total_brl
-    - duplicate_charge -> chỉ hoàn PHẦN DƯ: captured_total_brl - order_total_brl
-    - late_delivery_* -> theo EC_POLICY_V1 (có thể chỉ hoàn phí ship)
-    - đã hoàn xong / no_action -> 0 và refund_lines rỗng
-
-    Mỗi dòng: {"reason_code": <trong REASON_CODES>, "amount_brl": >= 0,
-               "entity_id": <order/payment id hoặc None>}.
-    Tổng các dòng phải bằng giá trị trả về đầu tiên (xem bất biến M1 bên dưới).
+    ``policy`` is the ``rules[primary_issue]`` entry from ``get_policy``; its ``refund_brl``
+    is the authoritative entitlement. The amount is then limited to what the customer
+    actually paid and has not already been refunded (``refunded_total_brl`` counts only
+    completed refunds).
     """
-    # get_policy cho sẵn refund_brl theo từng issue — dùng làm mốc thay vì tự suy.
-    # Xem docs/mcp-evidence-shapes.md mục get_policy.
-    policy_rule = (facts.get("policy_rules") or {}).get(primary_issue) or {}
-    policy_amount = policy_rule.get("refund_brl")
-    if policy_amount is None:
+    del order_total_brl  # entitlement comes from policy; kept for the agreed signature
+    reason_code = ISSUE_REASON_CODES.get(primary_issue)
+    entitlement = to_decimal((policy or {}).get("refund_brl"))
+    if reason_code is None or entitlement is None or entitlement <= 0:
         return 0.0, []
 
-    del signals  # TODO(Quốc): dùng signals để chia nhiều refund_lines khi cần
-    reason = REASON_BY_ISSUE.get(primary_issue)
-    if reason is None:
+    refunded = to_decimal(refunded_total_brl) or Decimal("0")
+    captured = to_decimal(captured_total_brl)
+    if captured is None or "PAY_NONE" in set(signals):
+        # Unknown or no capture: nothing proven to give back; never refund on a guess.
         return 0.0, []
-    amount = brl(policy_amount)
-    entity_id = (facts.get("order_ids") or [None])[0]
-    return amount, [{"reason_code": reason, "amount_brl": amount, "entity_id": entity_id}]
+
+    amount = min(entitlement, captured - refunded)
+    if amount <= 0:
+        return 0.0, []
+    amount = quantize(amount)
+    line = {"reason_code": reason_code, "amount_brl": float(amount), "entity_id": entity_id}
+    return float(amount), [line]
 
 
-def check_money_invariants(output: dict[str, Any], facts: dict[str, Any]) -> list[str]:
-    """Kiểm tra các bất biến tài chính. Trả về danh sách lỗi; rỗng là hợp lệ."""
-    problems: list[str] = []
-    resolution = output.get("financial_resolution") or {}
-    total = resolution.get("recommended_refund_brl")
-    lines = resolution.get("refund_lines") or []
+def check_money_invariants(
+    output: Mapping[str, Any], *, captured_total_brl: Any = None
+) -> list[str]:
+    """Return money-consistency violations of a case output; empty means valid."""
+    errors: list[str] = []
+    financial = output.get("financial_resolution") or {}
+    lines = financial.get("refund_lines") or []
+    status = (output.get("assessment") or {}).get("case_status")
 
-    if resolution.get("currency") != "BRL":
-        problems.append("M5: currency phải là BRL")
+    if financial.get("currency") != "BRL":
+        errors.append("currency must be BRL")
 
-    if not isinstance(total, (int, float)):
-        return [*problems, "M0: thiếu recommended_refund_brl"]
+    recommended = to_decimal(financial.get("recommended_refund_brl"))
+    if recommended is None:
+        errors.append("recommended_refund_brl is missing or not a number")
+        return errors
+    if recommended < 0:
+        errors.append("recommended_refund_brl must be >= 0")
 
-    # M1: tổng các dòng phải khớp tổng đề xuất.
-    line_sum = sum(float(line.get("amount_brl", 0)) for line in lines)
-    if abs(line_sum - float(total)) > MONEY_TOLERANCE_BRL:
-        problems.append(f"M1: tổng refund_lines {line_sum:.2f} != recommended {float(total):.2f}")
-
-    # M2: no_action thì không được đề xuất hoàn tiền.
-    if (output.get("assessment") or {}).get("case_status") == "no_action" and float(total) > 0:
-        problems.append("M2: case_status=no_action nhưng recommended_refund_brl > 0")
-
-    # M3: không có số tiền âm.
-    if float(total) < 0:
-        problems.append("M3: recommended_refund_brl âm")
+    if len(lines) > MAX_REFUND_LINES:
+        errors.append(f"refund_lines has more than {MAX_REFUND_LINES} entries")
+    line_total = Decimal("0")
     for index, line in enumerate(lines):
-        if float(line.get("amount_brl", 0)) < 0:
-            problems.append(f"M3: refund_lines[{index}].amount_brl âm")
+        amount = to_decimal(line.get("amount_brl"))
+        if amount is None:
+            errors.append(f"refund_lines[{index}].amount_brl is not a number")
+            continue
+        if amount < 0:
+            errors.append(f"refund_lines[{index}].amount_brl must be >= 0")
         if line.get("reason_code") not in REASON_CODES:
-            problems.append(f"M4: reason_code lạ {line.get('reason_code')!r}")
+            errors.append(f"refund_lines[{index}].reason_code is not in the vocabulary")
+        line_total += amount
+    if abs(line_total - recommended) > TOLERANCE_BRL:
+        errors.append(
+            f"refund_lines sum {quantize(line_total)} != recommended_refund_brl "
+            f"{quantize(recommended)}"
+        )
 
-    # M6: không hoàn nhiều hơn số đã thu.
-    captured = facts.get("captured_total_brl")
-    if isinstance(captured, (int, float)) and float(total) - float(captured) > MONEY_TOLERANCE_BRL:
-        problems.append(f"M6: hoàn {float(total):.2f} vượt số đã thu {float(captured):.2f}")
+    if status == "no_action" and recommended > 0:
+        errors.append("case_status no_action requires recommended_refund_brl == 0")
+    if recommended > 0 and status != "action_required":
+        errors.append("a positive refund requires case_status action_required")
 
-    return problems
+    actions = list(output.get("resolution_actions") or [])
+    if len(actions) != len(set(actions)):
+        errors.append("resolution_actions contains duplicates")
+    refund_actions = REFUND_ACTIONS.intersection(actions)
+    if recommended > 0 and not refund_actions:
+        errors.append("a positive refund requires a refund action in resolution_actions")
+    if status == "no_action" and refund_actions:
+        errors.append("case_status no_action cannot carry refund actions")
+
+    captured = to_decimal(captured_total_brl)
+    if captured is not None and recommended > captured + TOLERANCE_BRL:
+        errors.append(
+            f"recommended_refund_brl {quantize(recommended)} exceeds captured "
+            f"{quantize(captured)}"
+        )
+    return errors

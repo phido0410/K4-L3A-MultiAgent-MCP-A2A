@@ -45,8 +45,8 @@ Specialist agent không kết luận `primary_issue`. Mỗi agent chỉ phát **
 | Coordinator | `case` | Giao việc tuần tự, ghép tín hiệu, dựng output, chạy verifier | *không được gọi tool* | → order-agent |
 | Order/item | `claimed_order_id` | Trạng thái đơn, item, seller, tổng tiền đơn | `get_order`, `get_order_items`, `get_sellers`, `get_product_context` | `Finding` → shipment-agent |
 | Shipment | `claimed_order_id` | Timeline giao hàng, quy trách nhiệm trễ | `get_shipment_summary` | `Finding` → payment-agent |
-| Payment | `claimed_order_id` | Đối soát thanh toán, trạng thái hoàn tiền | `get_order_payments`, `get_payment_timeline`, `get_refund_timeline` | `Finding` → policy-agent |
-| Policy | `policy_version` | Quyền lợi theo `EC_POLICY_V1` | `get_policy` | `Finding` → verifier |
+| Payment | `claimed_order_id` + `order_total_brl`, `order_purchase_timestamp` từ order-agent | Lọc event theo cửa sổ `[purchase, opened_at]` để loại dòng nhiễu; phân loại `PAY_*` và `REFUND_*` | `get_payment_timeline`, `get_refund_timeline` | `Finding` (facts: `captured_total_brl`, `refunded_total_brl`, `duplicate_amount_brl`, `payment_reason`) → policy-agent |
+| Policy | `policy_version` + `primary_issue` + `seller_ids` | Áp rule của issue: `case_status`, `resolution_actions`, `refund_brl`, `responsible_parties` (gắn seller thật của case). Gọi riêng từng case, không cache | `get_policy` | `Finding` `POLICY_*` → `money.compute_refund()` và verifier |
 | Verifier | output nháp | 8 bất biến trước finalize | *không được gọi tool* | pass/fail |
 
 Allowlist được cưỡng chế trong code tại `a2a.py::TOOL_SCOPES`; gọi tool ngoài phạm vi ném `ToolScopeError`. Coordinator và verifier không có scope nào — mọi truy vấn evidence phải đi qua specialist, để trace luôn quy được evidence về đúng actor.
@@ -75,38 +75,27 @@ Trace chỉ ghi sự kiện và decision code quan sát được. Không ghi pro
 
 ## 4. Evidence lifecycle
 
-*(Chủ sở hữu: Phạm Cường Quốc — hoàn thiện ở D6)*
-
-Phần đã cưỡng chế trong code:
-
-1. `mcp_gateway.py` validate mọi response theo `mcp-evidence-response-v1.schema.json` trước khi trả về.
-2. `a2a.py::AgentContext.call` kiểm tra lại `evidence_ref` khớp `^ev_[A-Za-z0-9_-]{20,96}$`, rồi emit `tool_result_consumed` kèm ref và domain.
-3. Agent tự quyết ref nào vào `Finding.evidence` — chỉ ref thực sự dẫn tới kết luận, vì điểm evidence là F1.
-4. `workflow.py::_dedupe_refs` gộp ref theo thứ tự tiêu thụ, bỏ trùng, cắt còn 30 theo schema.
-5. `verifier.py` V2/V3 chặn mọi ref trong output hoặc trong `claim_assessments` mà không đến từ call của chính case này.
-
-Evidence không được tái sử dụng giữa các case: `AgentContext` được tạo mới cho từng case và không có bộ nhớ dùng chung.
-
-TODO(Quốc): mô tả cách map evidence vào từng claim và tiêu chí chọn ref khi một kết luận có nhiều nguồn cùng hỗ trợ.
+1. **Validate.** `EvidenceGateway.call()` kiểm tra mọi response theo `mcp-evidence-response-v1`. Agent kiểm tra thêm scope: `data.order_id` phải bằng `claimed_order_id` và policy phải đúng `policy_version` của case. Sai scope thì bỏ response, không cite.
+2. **Lọc nhiễu.** Response trộn dòng thật với dòng của kịch bản khác. Chỉ giữ event có `order_purchase_timestamp <= event_at <= opened_at` (so `datetime` có timezone, không so chuỗi). `get_order_payments` không có timestamp nên không dùng; dùng `get_payment_timeline`.
+3. **Lưu ref.** `evidence_ref` được lấy nguyên văn vào `EvidenceItem(evidence_ref, domain, tool_name)`. Không sửa, không tự tạo, không cache qua case: mỗi case gọi lại tool của chính nó.
+4. **Chỉ cite cái dẫn tới kết luận.** Điểm evidence là F1, cite thừa bị phạt như cite thiếu.
+   - Payment timeline: cite khi đọc được, vì mọi tín hiệu `PAY_*` dựa trên nó.
+   - Refund timeline: cite chỉ khi có event refund **trong cửa sổ**. Nếu chỉ có dòng nhiễu hoặc tool báo lỗi (đơn không có refund), kết luận `REFUND_NONE` và không cite.
+   - Policy: cite khi áp được rule cho `primary_issue` (`insufficient_evidence` không có rule nên không cite).
+5. **Trace.** Mỗi ref được cite có đúng một `tool_result_consumed` (actor, `tool_name`, `decision_code` = tín hiệu chính, `evidence_refs`). Policy agent emit thêm `policy_decided` với `decision_code` = `recommended_action`.
+6. **Map vào output.** `evidence_refs` của output = hợp các ref đã cite. `claim_assessments[].evidence_refs` = ref của agent hỗ trợ claim đó (claim thanh toán lấy payment/refund; `requested_full_refund` lấy thêm policy).
 
 ## 5. Failure policy
 
-*(Chủ sở hữu: Phạm Cường Quốc — hoàn thiện ở D6)*
-
 | Failure | Retry? | Fallback | Trace event/code |
 | --- | --- | --- | --- |
-| MCP timeout | Không (idempotent nhưng chưa bật) | `Finding` rỗng, pipeline đi tiếp | `handoff` / `AGENT_TIMEOUT` |
-| Tool trả lỗi | Không | `Finding` rỗng | `handoff` / `AGENT_ERROR_RuntimeError` |
-| Not found | Không | Tín hiệu `ORDER_NOT_FOUND` → `insufficient_evidence` | `handoff` / `AGENT_OK` |
-| Gọi tool ngoài scope | Không | **Không nuốt lỗi** — dừng cả run | ném `ToolScopeError` |
-| Xung đột nguồn | Không | Ghi `data_conflicts`, chọn nguồn có thẩm quyền cao hơn | TODO(Quốc) |
-| Kết quả specialist không hợp lệ | Không | Verifier chặn, không ghi output | `verification_completed` / `VERIFY_FAIL` |
+| MCP timeout / lỗi transport | Có: tối đa 2 lần (`MAX_ATTEMPTS`), tool chỉ đọc nên idempotent | Payment: `PAY_NONE`, confidence 0.2. Policy: không áp rule, `request_more_evidence`. Không cite gì | `facts.errors[<tool>]`; rules đưa về `insufficient_evidence` / `needs_investigation` |
+| Not found | Có, 1 lần (gateway không phân biệt not-found với lỗi khác) | `get_refund_timeline` lỗi ổn định = đơn không có refund → `REFUND_NONE`, không cite | `tool_result_consumed` không được emit cho tool đó |
+| Source conflict | Không | Tổng thu (payment) ≠ tổng đơn (order) kèm event `reconciliation_mismatch` mở → chọn nguồn `payment` | `data_conflicts`: `{"field": "payment_total_brl", "sources": ["order","payment"], "selected_source": "payment", "resolution_code": "PAYMENT_RECONCILIATION_OPEN"}` |
+| Evidence sai scope (order/policy version khác) | Không | Bỏ response, coi như không có evidence | `facts.errors` / `policy_error` |
+| Invalid specialist result | Không | Verifier chạy `money.check_money_invariants()`; vi phạm → không finalize bản đó, hạ về `needs_investigation` với refund 0 | `verification_completed` với `decision_code` báo lỗi |
 
-Nguyên tắc: **missing evidence không bao giờ được chuyển thành dữ liệu phỏng đoán**. Mọi đường fallback đều dẫn tới `insufficient_evidence` với confidence bị hạ trần, không dẫn tới một kết luận bịa.
-
-`ToolScopeError` cố tình không bị nuốt: đó là lỗi lập trình, không phải sự cố vận hành, nên phải nổ ngay lúc phát triển.
-
-TODO(Quốc): quyết định có bật retry cho MCP timeout không, và nếu có thì trần bao nhiêu lần.
+Retry phải có giới hạn và idempotent. Không chuyển missing evidence thành dữ liệu phỏng đoán.
 
 ## 6. Verification invariants
 
